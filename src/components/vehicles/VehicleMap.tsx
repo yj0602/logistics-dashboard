@@ -1,7 +1,7 @@
 import maplibregl from 'maplibre-gl'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { UserRole } from '../../types/auth'
-import type { Hub } from '../../types/hub'
+import type { Hub, MapPoint } from '../../types/hub'
 import type { VehicleStatus, VehicleWithEta } from '../../types/vehicle'
 import { AmazonMap } from '../map/AmazonMap'
 import { Card } from '../ui/Card'
@@ -28,6 +28,19 @@ const VEHICLE_STATUS_COLORS: Record<VehicleStatus, string> = {
   IN_TRANSIT: 'var(--blue-600)',
   DELAYED: 'var(--red-600)',
   ARRIVED: 'var(--green-600)',
+}
+
+function hasValidMapPoint(point: MapPoint | null | undefined): point is MapPoint {
+  return (
+    typeof point?.lat === 'number' &&
+    Number.isFinite(point.lat) &&
+    point.lat >= -90 &&
+    point.lat <= 90 &&
+    typeof point.lng === 'number' &&
+    Number.isFinite(point.lng) &&
+    point.lng >= -180 &&
+    point.lng <= 180
+  )
 }
 
 function getHubName(hubs: Hub[], hubId: string) {
@@ -129,6 +142,14 @@ export function VehicleMap({
 
   // Sync markers with map
   const displayVehicles = compact ? vehicles : filteredVehicles
+  const mappableVehicles = useMemo(
+    () => displayVehicles.filter((vehicle) => hasValidMapPoint(vehicle.currentLocation)),
+    [displayVehicles],
+  )
+  const mappableHubs = useMemo(
+    () => visibleHubs.filter((hub) => hasValidMapPoint(hub.location)),
+    [visibleHubs],
+  )
 
   // Handle vehicle selection from the list → fly to vehicle on map
   const handleVehicleSelectFromList = useCallback((vehicleId: string) => {
@@ -156,7 +177,7 @@ export function VehicleMap({
     const vehicle = filteredVehicles.find(
       (v) => v.vehicleId === selectedVehicleId,
     )
-    if (!vehicle) return
+    if (!vehicle || !hasValidMapPoint(vehicle.currentLocation)) return
 
     map.flyTo({
       center: [vehicle.currentLocation.lng, vehicle.currentLocation.lat],
@@ -187,21 +208,21 @@ export function VehicleMap({
 
     if (role === 'EMPLOYEE') {
       const hub = hubs.find((h) => h.hubId === employeeHubId)
-      if (hub) {
+      if (hub && hasValidMapPoint(hub.location)) {
         map.setCenter([hub.location.lng, hub.location.lat])
         map.setZoom(100)
       }
     } else {
-      if (visibleHubs.length === 0) {
+      if (mappableHubs.length === 0) {
         map.setCenter([127.5, 36.5])
         map.setZoom(6.5)
-      } else if (visibleHubs.length === 1) {
-        const hub = visibleHubs[0]
+      } else if (mappableHubs.length === 1) {
+        const hub = mappableHubs[0]
         map.setCenter([hub.location.lng, hub.location.lat])
         map.setZoom(10)
       } else {
         const bounds = new maplibregl.LngLatBounds()
-        for (const hub of visibleHubs) {
+        for (const hub of mappableHubs) {
           bounds.extend([hub.location.lng, hub.location.lat])
         }
         map.fitBounds(bounds, {
@@ -211,7 +232,7 @@ export function VehicleMap({
         })
       }
     }
-  }, [compact, role, employeeHubId, hubs, visibleHubs, mapReady])
+  }, [compact, role, employeeHubId, hubs, mappableHubs, mapReady])
 
   // Render markers on map
   useEffect(() => {
@@ -225,7 +246,7 @@ export function VehicleMap({
     markersRef.current = []
 
     // Add hub markers (clickable in non-compact mode for admin)
-    for (const hub of visibleHubs) {
+    for (const hub of mappableHubs) {
       const isHubSelected = selectedHubId === hub.hubId
       const el = createHubMarkerElement(hub.name, isHubSelected)
       if (!compact && role === 'ADMIN') {
@@ -241,7 +262,7 @@ export function VehicleMap({
     }
 
     // Add vehicle markers
-    for (const vehicle of displayVehicles) {
+    for (const vehicle of mappableVehicles) {
       const isSelected = vehicle.vehicleId === selectedVehicle?.vehicleId
       const el = createVehicleMarkerElement(vehicle, isSelected, compact)
       el.addEventListener('click', () => {
@@ -254,13 +275,15 @@ export function VehicleMap({
     }
 
     // Draw route for selected vehicle (non-compact only)
-    if (!compact && selectedVehicle && selectedVehicle.route.length >= 2) {
+    const selectedRoute = selectedVehicle?.route.filter(hasValidMapPoint) ?? []
+
+    if (!compact && selectedVehicle && selectedRoute.length >= 2) {
       const routeSourceId = 'selected-route'
       if (map.getSource(routeSourceId)) {
         map.removeLayer(`${routeSourceId}-line`)
         map.removeSource(routeSourceId)
       }
-      const coordinates = selectedVehicle.route.map((point) => [point.lng, point.lat])
+      const coordinates = selectedRoute.map((point) => [point.lng, point.lat])
       map.addSource(routeSourceId, {
         type: 'geojson',
         data: {
@@ -300,7 +323,7 @@ export function VehicleMap({
         }
       }
     }
-  }, [visibleHubs, displayVehicles, selectedVehicle, selectedHubId, compact, mapReady, role, handleHubSelectFromMap, handleVehicleSelectFromMap])
+  }, [mappableHubs, mappableVehicles, selectedVehicle, selectedHubId, compact, mapReady, role, handleHubSelectFromMap, handleVehicleSelectFromMap])
 
   const handleMapReady = useCallback((map: maplibregl.Map) => {
     mapInstanceRef.current = map

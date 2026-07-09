@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { SummaryMetricCard } from '../components/dashboard/SummaryMetricCard'
 import { PageHeader } from '../components/layout/PageHeader'
@@ -13,19 +13,43 @@ export function AdminDashboardPage() {
   const navigate = useNavigate()
   const [data, setData] = useState<AdminDashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  useEffect(() => {
+  const loadDashboardData = useCallback(() => {
+    setIsLoading(true)
+    setErrorMessage(null)
     getAdminDashboardData()
       .then(setData)
+      .catch(() => {
+        setData(null)
+        setErrorMessage('차량 정보를 불러오지 못했습니다.')
+      })
       .finally(() => setIsLoading(false))
   }, [])
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(loadDashboardData, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [loadDashboardData])
 
   if (isLoading) {
     return <div className="loading-state">차량 정보를 불러오는 중입니다.</div>
   }
 
+  if (errorMessage) {
+    return (
+      <Card title="데이터 조회 오류">
+        <div className="empty-state">
+          <p>{errorMessage}</p>
+          <Button onClick={loadDashboardData}>다시 시도</Button>
+        </div>
+      </Card>
+    )
+  }
+
   if (!data) {
-    return <div className="empty-state">차량 정보를 불러오지 못했습니다.</div>
+    return <div className="empty-state">표시할 대시보드 데이터가 없습니다.</div>
   }
 
   return (
@@ -96,7 +120,7 @@ export function AdminDashboardPage() {
                     <tr key={vehicle.vehicleId}>
                       <td>{vehicle.vehicleId}</td>
                       <td>{vehicle.destinationHubId}</td>
-                      <td>{vehicle.eta.estimatedArrivalTime}</td>
+                      <td>{vehicle.eta.estimatedArrivalTime ?? '-'}</td>
                       <td>
                         <StatusBadge status={vehicle.status} />
                       </td>
@@ -112,29 +136,33 @@ export function AdminDashboardPage() {
 
       <Card title="Hub 운영 현황">
         <div className="hub-summary-grid">
-          {data.hubs.map((hub) => (
-            <div className="hub-summary" key={hub.hubId}>
-              <strong>{hub.hubId}</strong>
-              <dl>
-                <div>
-                  <dt>도착</dt>
-                  <dd>{hub.arrivedVehicles}</dd>
-                </div>
-                <div>
-                  <dt>운행 중</dt>
-                  <dd>{hub.inTransitVehicles}</dd>
-                </div>
-                <div>
-                  <dt>지연</dt>
-                  <dd>{hub.delayedVehicles}</dd>
-                </div>
-                <div>
-                  <dt>막차 ETA</dt>
-                  <dd>{hub.lastVehicleEta}</dd>
-                </div>
-              </dl>
-            </div>
-          ))}
+          {data.hubs.length === 0 ? (
+            <div className="empty-state">현재 조회 가능한 Hub가 없습니다.</div>
+          ) : (
+            data.hubs.map((hub) => (
+              <div className="hub-summary" key={hub.hubId}>
+                <strong>{hub.hubId}</strong>
+                <dl>
+                  <div>
+                    <dt>도착</dt>
+                    <dd>{hub.arrivedVehicles}</dd>
+                  </div>
+                  <div>
+                    <dt>운행 중</dt>
+                    <dd>{hub.inTransitVehicles}</dd>
+                  </div>
+                  <div>
+                    <dt>지연</dt>
+                    <dd>{hub.delayedVehicles}</dd>
+                  </div>
+                  <div>
+                    <dt>막차 ETA</dt>
+                    <dd>{hub.lastVehicleEta}</dd>
+                  </div>
+                </dl>
+              </div>
+            ))
+          )}
         </div>
       </Card>
     </div>

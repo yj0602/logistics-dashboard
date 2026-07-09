@@ -1,8 +1,17 @@
 import { mockEtaPredictions, mockVehicles } from '../mocks/vehicles'
 import type { UserRole } from '../types/auth'
-import type { VehicleWithEta } from '../types/vehicle'
+import type { EtaPrediction, VehicleWithEta } from '../types/vehicle'
 
 const EMPLOYEE_HUB_ID = 'HUB-ULSAN'
+
+function createEmptyEtaPrediction(vehicleId: string): EtaPrediction {
+  return {
+    vehicleId,
+    estimatedArrivalTime: null,
+    delayMinutes: 0,
+    predictionUpdatedAt: '-',
+  }
+}
 
 export async function getVehicles(
   role: UserRole = 'ADMIN',
@@ -15,7 +24,9 @@ export async function getVehicles(
 
   return scopedVehicles.map((vehicle) => ({
     ...vehicle,
-    eta: mockEtaPredictions.find((eta) => eta.vehicleId === vehicle.vehicleId)!,
+    eta:
+      mockEtaPredictions.find((eta) => eta.vehicleId === vehicle.vehicleId) ??
+      createEmptyEtaPrediction(vehicle.vehicleId),
   }))
 }
 

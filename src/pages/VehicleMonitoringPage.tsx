@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import type { AppShellContext } from '../components/layout/AppShell'
 import { PageHeader } from '../components/layout/PageHeader'
+import { Button } from '../components/ui/Button'
+import { Card } from '../components/ui/Card'
 import { VehicleMap } from '../components/vehicles/VehicleMap'
 import { getHubs } from '../services/hubService'
 import { getVehicles } from '../services/vehicleService'
@@ -13,18 +15,43 @@ export function VehicleMonitoringPage() {
   const [vehicles, setVehicles] = useState<VehicleWithEta[]>([])
   const [hubs, setHubs] = useState<Hub[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  useEffect(() => {
+  const loadMapData = useCallback(() => {
+    setIsLoading(true)
+    setErrorMessage(null)
     Promise.all([getVehicles(role), getHubs()])
       .then(([vehicleData, hubData]) => {
         setVehicles(vehicleData)
         setHubs(hubData)
       })
+      .catch(() => {
+        setVehicles([])
+        setHubs([])
+        setErrorMessage('차량 위치 정보를 불러오지 못했습니다.')
+      })
       .finally(() => setIsLoading(false))
   }, [role])
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(loadMapData, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [loadMapData])
+
   if (isLoading) {
     return <div className="loading-state">차량 위치 정보를 불러오는 중입니다.</div>
+  }
+
+  if (errorMessage) {
+    return (
+      <Card title="데이터 조회 오류">
+        <div className="empty-state">
+          <p>{errorMessage}</p>
+          <Button onClick={loadMapData}>다시 시도</Button>
+        </div>
+      </Card>
+    )
   }
 
   return (

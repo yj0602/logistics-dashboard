@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { SummaryMetricCard } from '../components/dashboard/SummaryMetricCard'
 import { PageHeader } from '../components/layout/PageHeader'
@@ -13,19 +13,43 @@ export function EmployeeDashboardPage() {
   const navigate = useNavigate()
   const [data, setData] = useState<EmployeeDashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  useEffect(() => {
+  const loadDashboardData = useCallback(() => {
+    setIsLoading(true)
+    setErrorMessage(null)
     getEmployeeDashboardData()
       .then(setData)
+      .catch(() => {
+        setData(null)
+        setErrorMessage('차량 정보를 불러오지 못했습니다.')
+      })
       .finally(() => setIsLoading(false))
   }, [])
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(loadDashboardData, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [loadDashboardData])
 
   if (isLoading) {
     return <div className="loading-state">차량 정보를 불러오는 중입니다.</div>
   }
 
+  if (errorMessage) {
+    return (
+      <Card title="데이터 조회 오류">
+        <div className="empty-state">
+          <p>{errorMessage}</p>
+          <Button onClick={loadDashboardData}>다시 시도</Button>
+        </div>
+      </Card>
+    )
+  }
+
   if (!data) {
-    return <div className="empty-state">차량 정보를 불러오지 못했습니다.</div>
+    return <div className="empty-state">표시할 대시보드 데이터가 없습니다.</div>
   }
 
   const waitingMinutes = data.summary.lastVehicleEta === '06:10' ? 40 : 0
@@ -79,36 +103,40 @@ export function EmployeeDashboardPage() {
         </Card>
 
         <Card title="내 Hub 차량 현황">
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>차량</th>
-                  <th>출발지</th>
-                  <th>ETA</th>
-                  <th>상태</th>
-                  <th>지연</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.vehicles.map((vehicle) => (
-                  <tr key={vehicle.vehicleId}>
-                    <td>{vehicle.vehicleId}</td>
-                    <td>{vehicle.departureHubId}</td>
-                    <td>{vehicle.eta.estimatedArrivalTime ?? '-'}</td>
-                    <td>
-                      <StatusBadge status={vehicle.status} />
-                    </td>
-                    <td className={vehicle.eta.delayMinutes > 0 ? 'danger-text' : ''}>
-                      {vehicle.eta.delayMinutes > 0
-                        ? `${vehicle.eta.delayMinutes}분`
-                        : '-'}
-                    </td>
+          {data.vehicles.length === 0 ? (
+            <div className="empty-state">현재 조회 가능한 차량이 없습니다.</div>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>차량</th>
+                    <th>출발지</th>
+                    <th>ETA</th>
+                    <th>상태</th>
+                    <th>지연</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {data.vehicles.map((vehicle) => (
+                    <tr key={vehicle.vehicleId}>
+                      <td>{vehicle.vehicleId}</td>
+                      <td>{vehicle.departureHubId}</td>
+                      <td>{vehicle.eta.estimatedArrivalTime ?? '-'}</td>
+                      <td>
+                        <StatusBadge status={vehicle.status} />
+                      </td>
+                      <td className={vehicle.eta.delayMinutes > 0 ? 'danger-text' : ''}>
+                        {vehicle.eta.delayMinutes > 0
+                          ? `${vehicle.eta.delayMinutes}분`
+                          : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Card>
       </section>
 
