@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { SummaryMetricCard } from '../components/dashboard/SummaryMetricCard'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Button } from '../components/ui/Button'
@@ -9,6 +10,7 @@ import { getAdminDashboardData } from '../services/dashboardService'
 import type { AdminDashboardData } from '../types/dashboard'
 
 export function AdminDashboardPage() {
+  const navigate = useNavigate()
   const [data, setData] = useState<AdminDashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -69,7 +71,7 @@ export function AdminDashboardPage() {
         <Card
           className="dashboard-map-card"
           title="차량 위치 지도"
-          action={<Button>전체 지도 보기</Button>}
+          action={<Button onClick={() => navigate('/vehicles')}>전체 지도 보기</Button>}
         >
           <VehicleMap compact vehicles={data.vehicles} />
         </Card>
