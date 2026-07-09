@@ -54,25 +54,19 @@ export function useMapLibre(options: UseMapLibreOptions = {}): UseMapLibreReturn
 
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
-  const styleConfigRef = useRef<ReturnType<typeof getMapStyleUrl> | null>(null)
-  if (styleConfigRef.current === null) {
-    styleConfigRef.current = getMapStyleUrl()
-  }
+  const [styleConfig] = useState(getMapStyleUrl)
   const [map, setMap] = useState<maplibregl.Map | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
-  const [error, setError] = useState<string | null>(
-    () => styleConfigRef.current?.error ?? null,
-  )
+  const [error, setError] = useState<string | null>(() => styleConfig.error)
 
   useEffect(() => {
     if (!mapRef.current) return
     if (mapInstanceRef.current) return
 
-    const { url, error: configError } = styleConfigRef.current!
+    const { url, error: configError } = styleConfig
 
     if (configError) {
       console.error(`[Amazon Location] ${configError}`)
-      setError(configError)
       return
     }
 
@@ -116,9 +110,11 @@ export function useMapLibre(options: UseMapLibreOptions = {}): UseMapLibreReturn
     } catch (err) {
       const message = err instanceof Error ? err.message : '지도 초기화에 실패했습니다.'
       console.error('[Amazon Location] Init error:', message)
-      if (!cancelled) {
-        setError(message)
-      }
+      window.setTimeout(() => {
+        if (!cancelled) {
+          setError(message)
+        }
+      }, 0)
     }
 
     return () => {

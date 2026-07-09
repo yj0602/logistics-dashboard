@@ -3,17 +3,23 @@ import { useOutletContext } from 'react-router-dom'
 import type { AppShellContext } from '../components/layout/AppShell'
 import { PageHeader } from '../components/layout/PageHeader'
 import { VehicleMap } from '../components/vehicles/VehicleMap'
+import { getHubs } from '../services/hubService'
 import { getVehicles } from '../services/vehicleService'
+import type { Hub } from '../types/hub'
 import type { VehicleWithEta } from '../types/vehicle'
 
 export function VehicleMonitoringPage() {
   const { role } = useOutletContext<AppShellContext>()
   const [vehicles, setVehicles] = useState<VehicleWithEta[]>([])
+  const [hubs, setHubs] = useState<Hub[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    getVehicles(role)
-      .then(setVehicles)
+    Promise.all([getVehicles(role), getHubs()])
+      .then(([vehicleData, hubData]) => {
+        setVehicles(vehicleData)
+        setHubs(hubData)
+      })
       .finally(() => setIsLoading(false))
   }, [role])
 
@@ -32,7 +38,7 @@ export function VehicleMonitoringPage() {
         title="실시간 차량 위치"
         updatedAt="05:30"
       />
-      <VehicleMap role={role} vehicles={vehicles} />
+      <VehicleMap hubs={hubs} role={role} vehicles={vehicles} />
     </div>
   )
 }

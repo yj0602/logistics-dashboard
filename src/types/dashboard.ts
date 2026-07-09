@@ -1,4 +1,5 @@
 import type { VehicleWithEta } from './vehicle'
+import type { Hub } from './hub'
 
 export interface DashboardSummary {
   totalVehicles: number
@@ -21,6 +22,7 @@ export interface AdminDashboardData {
   summary: DashboardSummary
   delayedVehicles: VehicleWithEta[]
   vehicles: VehicleWithEta[]
+  mapHubs: Hub[]
   hubs: HubOperationSummary[]
 }
 
@@ -30,4 +32,5 @@ export interface EmployeeDashboardData {
   summary: DashboardSummary
   delayedVehicles: VehicleWithEta[]
   vehicles: VehicleWithEta[]
+  mapHubs: Hub[]
 }

@@ -73,7 +73,7 @@ export function AdminDashboardPage() {
           title="차량 위치 지도"
           action={<Button onClick={() => navigate('/vehicles')}>전체 지도 보기</Button>}
         >
-          <VehicleMap compact vehicles={data.vehicles} />
+          <VehicleMap compact hubs={data.mapHubs} vehicles={data.vehicles} />
         </Card>
 
         <Card title="지연 차량 목록">

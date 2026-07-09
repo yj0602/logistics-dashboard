@@ -56,6 +56,7 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     },
     delayedVehicles,
     vehicles,
+    mapHubs: mockHubs,
     hubs: buildHubSummary(vehicles),
   }
 }
@@ -85,5 +86,6 @@ export async function getEmployeeDashboardData(
     },
     delayedVehicles,
     vehicles,
+    mapHubs: mockHubs.filter((item) => item.hubId === employeeHubId),
   }
 }

@@ -1,7 +1,7 @@
 import maplibregl from 'maplibre-gl'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { mockHubs } from '../../mocks/hubs'
 import type { UserRole } from '../../types/auth'
+import type { Hub } from '../../types/hub'
 import type { VehicleStatus, VehicleWithEta } from '../../types/vehicle'
 import { AmazonMap } from '../map/AmazonMap'
 import { Card } from '../ui/Card'
@@ -9,6 +9,7 @@ import { StatusBadge } from '../ui/StatusBadge'
 
 interface VehicleMapProps {
   vehicles: VehicleWithEta[]
+  hubs: Hub[]
   compact?: boolean
   role?: UserRole
   employeeHubId?: string
@@ -29,8 +30,8 @@ const VEHICLE_STATUS_COLORS: Record<VehicleStatus, string> = {
   ARRIVED: 'var(--green-600)',
 }
 
-function getHubName(hubId: string) {
-  return mockHubs.find((hub) => hub.hubId === hubId)?.name ?? hubId
+function getHubName(hubs: Hub[], hubId: string) {
+  return hubs.find((hub) => hub.hubId === hubId)?.name ?? hubId
 }
 
 function isApproaching(vehicle: VehicleWithEta) {
@@ -60,6 +61,7 @@ function createVehicleMarkerElement(
 
 export function VehicleMap({
   vehicles,
+  hubs,
   compact = false,
   role = 'ADMIN',
   employeeHubId = 'HUB-ULSAN',
@@ -116,13 +118,13 @@ export function VehicleMap({
   }, [hubScopedVehicles])
   const visibleHubs = useMemo(() => {
     if (role === 'EMPLOYEE') {
-      return mockHubs.filter((hub) => hub.hubId === employeeHubId)
+      return hubs.filter((hub) => hub.hubId === employeeHubId)
     }
 
     return selectedHubId === 'ALL'
-      ? mockHubs
-      : mockHubs.filter((hub) => hub.hubId === selectedHubId)
-  }, [employeeHubId, role, selectedHubId])
+      ? hubs
+      : hubs.filter((hub) => hub.hubId === selectedHubId)
+  }, [employeeHubId, hubs, role, selectedHubId])
   const statusFilters: StatusFilter[] = ['ALL', 'IN_TRANSIT', 'DELAYED', 'ARRIVED']
 
   // Sync markers with map
@@ -184,7 +186,7 @@ export function VehicleMap({
     if (!map || !mapReady || !compact) return
 
     if (role === 'EMPLOYEE') {
-      const hub = mockHubs.find((h) => h.hubId === employeeHubId)
+      const hub = hubs.find((h) => h.hubId === employeeHubId)
       if (hub) {
         map.setCenter([hub.location.lng, hub.location.lat])
         map.setZoom(100)
@@ -209,7 +211,7 @@ export function VehicleMap({
         })
       }
     }
-  }, [compact, role, employeeHubId, visibleHubs, mapReady])
+  }, [compact, role, employeeHubId, hubs, visibleHubs, mapReady])
 
   // Render markers on map
   useEffect(() => {
@@ -338,7 +340,7 @@ export function VehicleMap({
               </>
             ) : (
               <>
-                <strong>{getHubName(employeeHubId)}</strong>
+                <strong>{getHubName(hubs, employeeHubId)}</strong>
                 <span>도착 예정 {hubScopedVehicles.length}대</span>
                 <span>막차 ETA {selectedVehicle?.eta.estimatedArrivalTime ?? '-'}</span>
                 <span>
@@ -363,7 +365,7 @@ export function VehicleMap({
                   value={selectedHubId}
                 >
                   <option value="ALL">전체 Hub</option>
-                  {mockHubs.map((hub) => (
+                  {hubs.map((hub) => (
                     <option key={hub.hubId} value={hub.hubId}>
                       {hub.name}
                     </option>
@@ -422,7 +424,7 @@ export function VehicleMap({
                     )}
                   </span>
                   <StatusBadge status={vehicle.status} />
-                  <small>{getHubName(vehicle.destinationHubId)}</small>
+                  <small>{getHubName(hubs, vehicle.destinationHubId)}</small>
                   <small>
                     ETA {vehicle.eta.estimatedArrivalTime ?? '-'}
                     {vehicle.eta.delayMinutes > 0 &&
@@ -465,11 +467,11 @@ export function VehicleMap({
           <dl className="detail-list">
             <div>
               <dt>출발 Hub</dt>
-              <dd>{getHubName(selectedVehicle.departureHubId)}</dd>
+              <dd>{getHubName(hubs, selectedVehicle.departureHubId)}</dd>
             </div>
             <div>
               <dt>도착 Hub</dt>
-              <dd>{getHubName(selectedVehicle.destinationHubId)}</dd>
+              <dd>{getHubName(hubs, selectedVehicle.destinationHubId)}</dd>
             </div>
             <div>
               <dt>현재 위치</dt>
