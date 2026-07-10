@@ -8,6 +8,9 @@ export function Sidebar({ role }: { role: UserRole }) {
     { label: '대시보드', path: dashboardPath },
     { label: '실시간 지도', path: '/vehicles' },
     { label: '중간 배송', path: '/delivery-analysis' },
+    ...(role === 'EMPLOYEE'
+      ? [{ label: '배송 최적 경로', path: '/route-optimization-test' }]
+      : []),
   ]
 
   return (

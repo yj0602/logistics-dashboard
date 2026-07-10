@@ -4,6 +4,7 @@ import { AdminDashboardPage } from './pages/AdminDashboardPage'
 import { EmployeeDashboardPage } from './pages/EmployeeDashboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
+import { RouteOptimizationTestPage } from './pages/RouteOptimizationTestPage'
 import { VehicleMonitoringPage } from './pages/VehicleMonitoringPage'
 
 function App() {
@@ -22,6 +23,10 @@ function App() {
         <Route
           path="/delivery-analysis"
           element={<PlaceholderPage title="중간 배송 투입 분석" />}
+        />
+        <Route
+          path="/route-optimization-test"
+          element={<RouteOptimizationTestPage />}
         />
       </Route>
       <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
