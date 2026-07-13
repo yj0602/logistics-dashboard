@@ -9,7 +9,7 @@ import type { RouteOptimizationInput } from '../types/routeOptimization'
  * 효율적 순서 예상: A(북동) → C(동쪽) → D(남쪽) → B(남서) 또는 유사
  */
 export const mockRouteOptimizationInput: RouteOptimizationInput = {
-  driverId: 'EMP-001',
+  vehicleId: 'VEH-MOCK-001',
   optimizationMode: 'FASTEST',
   startLocation: {
     latitude: 59.3293,

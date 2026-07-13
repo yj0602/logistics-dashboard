@@ -2,6 +2,22 @@ import type { EtaPrediction, Vehicle } from '../types/vehicle'
 
 export const mockVehicles: Vehicle[] = [
   {
+    vehicleId: 'VEH001',
+    departureHubId: 'HUB-BUSAN',
+    destinationHubId: 'HUB-ULSAN',
+    status: 'IN_TRANSIT',
+    currentLocation: { lat: 35.27, lng: 129.08, x: 55, y: 70 },
+    route: [
+      { lat: 35.1796, lng: 129.0756, x: 51, y: 82, label: '부산 Hub' },
+      { lat: 35.27, lng: 129.08, x: 55, y: 70, label: '현재 위치' },
+      { lat: 35.5384, lng: 129.3114, x: 78, y: 50, label: '울산 Hub' },
+    ],
+    currentRoad: '동해고속도로',
+    speedKmh: 70,
+    remainingDistanceKm: 25.0,
+    locationUpdatedAt: '05:31',
+  },
+  {
     vehicleId: 'TRUCK-01',
     departureHubId: 'HUB-BUSAN',
     destinationHubId: 'HUB-ULSAN',
@@ -114,6 +130,13 @@ export const mockVehicles: Vehicle[] = [
 ]
 
 export const mockEtaPredictions: EtaPrediction[] = [
+  {
+    vehicleId: 'VEH001',
+    estimatedArrivalTime: '06:00',
+    delayMinutes: 5,
+    predictionUpdatedAt: '05:30',
+    confidence: 0.88,
+  },
   {
     vehicleId: 'TRUCK-01',
     estimatedArrivalTime: '05:40',

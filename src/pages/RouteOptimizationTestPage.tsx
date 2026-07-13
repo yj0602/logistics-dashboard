@@ -1,42 +1,168 @@
 import maplibregl from 'maplibre-gl'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AmazonMap } from '../components/map/AmazonMap'
-import { mockRouteOptimizationInput } from '../mocks/mockRouteOptimization'
+import { getVehicleRouteInput } from '../services/routeInputService'
+import {
+  mapRouteInputResponse,
+  resolveDepartureHubLocation,
+} from '../services/routeInputMapper'
 import { optimizeAndCalculateRoute } from '../services/routeOptimizationService'
-import type { RouteOptimizationResult, RouteGeometry } from '../types/routeOptimization'
+import { getVehicles } from '../services/vehicleService'
+import { getHubs } from '../services/hubService'
+import type {
+  RouteOptimizationInput,
+  RouteOptimizationResult,
+  RouteGeometry,
+} from '../types/routeOptimization'
+import type { Vehicle } from '../types/vehicle'
+import type { Hub } from '../types/hub'
 
-type TestStatus = 'idle' | 'loading' | 'success' | 'error'
+type PageStatus = 'idle' | 'loading-input' | 'loading-optimize' | 'success' | 'error'
 
 export function RouteOptimizationTestPage() {
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef<maplibregl.Marker[]>([])
-  const [status, setStatus] = useState<TestStatus>('idle')
+  const abortRef = useRef<AbortController | null>(null)
+
+  const [status, setStatus] = useState<PageStatus>('idle')
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<RouteOptimizationResult | null>(null)
+  const [input, setInput] = useState<RouteOptimizationInput | null>(null)
 
-  const input = mockRouteOptimizationInput
+  // 차량 목록 및 허브 목록 (출발 허브 조회용)
+  const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  const [hubs, setHubs] = useState<Hub[]>([])
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string>('')
+  const [vehicleIdInput, setVehicleIdInput] = useState<string>('VEH001')
+
+  // 초기 데이터 로드: 차량 목록, 허브 목록
+  useEffect(() => {
+    async function loadBaseData() {
+      try {
+        const [vehicleList, hubList] = await Promise.all([
+          getVehicles('ADMIN'),
+          getHubs(),
+        ])
+        setVehicles(vehicleList)
+        setHubs(hubList)
+      } catch (err) {
+        console.error('[RouteOptimizationTest] 기본 데이터 로드 실패:', err)
+      }
+    }
+    loadBaseData()
+  }, [])
+
+  // 언마운트 시 진행 중인 요청 취소
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort()
+    }
+  }, [])
+
+  // ─── 경로 입력 데이터 조회 + 최적화 실행 ───
+
+  async function handleFetchAndOptimize() {
+    const vehicleId = vehicleIdInput.trim()
+    if (!vehicleId) {
+      setError('차량 ID를 입력해 주세요.')
+      setStatus('error')
+      return
+    }
+
+    // 이전 요청 취소
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    setStatus('loading-input')
+    setError(null)
+    setResult(null)
+    setInput(null)
+    setSelectedVehicleId(vehicleId)
+
+    // 기존 경로 레이어 제거
+    if (mapInstanceRef.current) {
+      removeRouteLayer(mapInstanceRef.current)
+      clearMarkers()
+    }
+
+    try {
+      // 1단계: API에서 경로 입력 데이터 조회
+      const apiResponse = await getVehicleRouteInput(vehicleId, controller.signal)
+
+      // 2단계: 차량의 출발 허브 좌표 조회
+      const startLocation = resolveDepartureHubLocation(vehicleId, vehicles, hubs)
+
+      // 3단계: API 응답 → 최적화 입력 변환
+      const optimizationInput = mapRouteInputResponse(apiResponse, {
+        startLocation,
+        optimizationMode: 'FASTEST',
+      })
+
+      if (controller.signal.aborted) return
+
+      setInput(optimizationInput)
+
+      // 지도에 마커 표시
+      if (mapInstanceRef.current) {
+        addMarkers(mapInstanceRef.current, optimizationInput)
+      }
+
+      // 4단계: 최적화 실행
+      setStatus('loading-optimize')
+      const { optimizationResult, routeGeometry } =
+        await optimizeAndCalculateRoute(optimizationInput)
+
+      if (controller.signal.aborted) return
+
+      setResult(optimizationResult)
+      setStatus('success')
+
+      // 지도에 경로 그리기 + 최적화된 순서로 마커 업데이트
+      if (mapInstanceRef.current) {
+        drawRoute(mapInstanceRef.current, routeGeometry)
+        updateMarkersWithOptimizedOrder(
+          mapInstanceRef.current,
+          optimizationInput,
+          optimizationResult,
+        )
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      const msg = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.'
+      setError(msg)
+      setStatus('error')
+      console.error('[RouteOptimizationTest]', err)
+    }
+  }
+
+  // ─── 지도 마커 관리 ───
+
+  function clearMarkers() {
+    markersRef.current.forEach((m) => m.remove())
+    markersRef.current = []
+  }
 
   const addMarkers = useCallback(
-    (map: maplibregl.Map) => {
-      // 기존 마커 제거
-      markersRef.current.forEach((m) => m.remove())
-      markersRef.current = []
+    (map: maplibregl.Map, data: RouteOptimizationInput) => {
+      clearMarkers()
 
       // 출발지 마커
       const startEl = document.createElement('div')
       startEl.className = 'maplibre-hub-marker'
       startEl.innerHTML = '<span>S</span> 출발지'
       const startMarker = new maplibregl.Marker({ element: startEl })
-        .setLngLat([input.startLocation.longitude, input.startLocation.latitude])
+        .setLngLat([data.startLocation.longitude, data.startLocation.latitude])
         .addTo(map)
       markersRef.current.push(startMarker)
 
       // 배송지 마커들
-      input.destinations.forEach((dest, idx) => {
+      data.destinations.forEach((dest, idx) => {
         const el = document.createElement('div')
         el.className = 'maplibre-vehicle-marker marker-in_transit'
         el.style.cursor = 'default'
-        el.innerHTML = `${idx + 1}<span class="marker-sub-label">${dest.name}</span>`
+        const label = dest.name ?? dest.destinationId
+        el.innerHTML = `${idx + 1}<span class="marker-sub-label">${label}</span>`
         const marker = new maplibregl.Marker({ element: el })
           .setLngLat([dest.longitude, dest.latitude])
           .addTo(map)
@@ -45,51 +171,22 @@ export function RouteOptimizationTestPage() {
 
       // 모든 좌표로 bounds 맞추기
       const bounds = new maplibregl.LngLatBounds()
-      bounds.extend([input.startLocation.longitude, input.startLocation.latitude])
-      input.destinations.forEach((d) => bounds.extend([d.longitude, d.latitude]))
+      bounds.extend([data.startLocation.longitude, data.startLocation.latitude])
+      data.destinations.forEach((d) => bounds.extend([d.longitude, d.latitude]))
       map.fitBounds(bounds, { padding: 60 })
     },
-    [input],
+    [],
   )
 
-  // 지도 준비 시 마커 표시
+  // 지도 준비 시 콜백
   const handleMapReady = useCallback(
     (map: maplibregl.Map) => {
       mapInstanceRef.current = map
-      addMarkers(map)
     },
-    [addMarkers],
+    [],
   )
 
-  // 경로 최적화 + 도로 경로 계산 실행
-  async function handleOptimize() {
-    if (!mapInstanceRef.current) return
-    setStatus('loading')
-    setError(null)
-    setResult(null)
-
-    // 기존 경로 레이어 제거
-    removeRouteLayer(mapInstanceRef.current)
-
-    try {
-      const { optimizationResult, routeGeometry } =
-        await optimizeAndCalculateRoute(input)
-
-      setResult(optimizationResult)
-      setStatus('success')
-
-      // 도로 경로를 지도에 그리기
-      drawRoute(mapInstanceRef.current, routeGeometry)
-
-      // 최적화된 순서로 마커 업데이트
-      updateMarkersWithOptimizedOrder(mapInstanceRef.current, optimizationResult)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : '알 수 없는 오류'
-      setError(msg)
-      setStatus('error')
-      console.error('[RouteOptimizationTest]', err)
-    }
-  }
+  // ─── 지도 경로 그리기 ───
 
   function removeRouteLayer(map: maplibregl.Map) {
     if (map.getLayer('optimized-route-line')) {
@@ -131,6 +228,7 @@ export function RouteOptimizationTestPage() {
 
   function updateMarkersWithOptimizedOrder(
     map: maplibregl.Map,
+    data: RouteOptimizationInput,
     optimizationResult: RouteOptimizationResult,
   ) {
     // 기존 배송지 마커 제거 (인덱스 1부터 = 배송지 마커)
@@ -139,14 +237,15 @@ export function RouteOptimizationTestPage() {
 
     // 최적화된 순서대로 마커 다시 추가
     optimizationResult.optimizedOrder.forEach((wp) => {
-      const dest = input.destinations.find(
+      const dest = data.destinations.find(
         (d) => d.destinationId === wp.destinationId,
       )
       if (!dest) return
       const el = document.createElement('div')
       el.className = 'maplibre-vehicle-marker marker-arrived'
       el.style.cursor = 'default'
-      el.innerHTML = `${wp.optimizedSequence}<span class="marker-sub-label">${dest.name}</span>`
+      const label = dest.name ?? dest.destinationId
+      el.innerHTML = `${wp.optimizedSequence}<span class="marker-sub-label">${label}</span>`
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([dest.longitude, dest.latitude])
         .addTo(map)
@@ -154,22 +253,51 @@ export function RouteOptimizationTestPage() {
     })
   }
 
+  // ─── 렌더링 ───
+
+  const isLoading = status === 'loading-input' || status === 'loading-optimize'
+  const statusMessage =
+    status === 'loading-input'
+      ? '경로 입력 데이터 불러오는 중...'
+      : status === 'loading-optimize'
+        ? '경로 최적화 실행 중...'
+        : null
+
+  // 지도 중심: 입력 데이터가 있으면 출발지, 없으면 한국 중심부
+  const mapCenter: [number, number] = input
+    ? [input.startLocation.longitude, input.startLocation.latitude]
+    : [128.9, 35.3]
+
   return (
     <div className="page-stack">
       <div className="page-header">
         <div>
           <h1>최적화 경로 조회</h1>
-          <p>
-            Amazon Location Service OptimizeWaypoints + CalculateRoutes
-          </p>
+          <p>Amazon Location Service OptimizeWaypoints + CalculateRoutes</p>
         </div>
-        <button
-          className="btn btn-primary"
-          onClick={handleOptimize}
-          disabled={status === 'loading'}
-        >
-          {status === 'loading' ? '최적화 중...' : '경로 최적화 실행'}
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <input
+            type="text"
+            value={vehicleIdInput}
+            onChange={(e) => setVehicleIdInput(e.target.value)}
+            placeholder="차량 ID (예: VEH001)"
+            style={{
+              padding: '6px 12px',
+              border: '1px solid var(--gray-300)',
+              borderRadius: '6px',
+              fontSize: '14px',
+              width: '160px',
+            }}
+            disabled={isLoading}
+          />
+          <button
+            className="btn btn-primary"
+            onClick={handleFetchAndOptimize}
+            disabled={isLoading}
+          >
+            {isLoading ? (statusMessage ?? '처리 중...') : '경로 최적화 실행'}
+          </button>
+        </div>
       </div>
 
       {/* 지도 영역 */}
@@ -177,13 +305,16 @@ export function RouteOptimizationTestPage() {
         <div className="card-header">
           <h2>배송 경로 지도</h2>
           <span style={{ fontSize: '12px', color: 'var(--gray-500)' }}>
+            {selectedVehicleId
+              ? `차량: ${selectedVehicleId} | `
+              : ''}
             파란색 마커: 원래 순서 | 초록색 마커: 최적화된 순서
           </span>
         </div>
         <AmazonMap
           className="map-full"
-          center={[input.startLocation.longitude, input.startLocation.latitude]}
-          zoom={12}
+          center={mapCenter}
+          zoom={10}
           navigationControl
           onMapReady={handleMapReady}
         />
@@ -201,7 +332,7 @@ export function RouteOptimizationTestPage() {
       )}
 
       {/* 비교 결과 */}
-      {result && (
+      {result && input && (
         <div className="card">
           <div className="card-header">
             <h2>최적화 결과 비교</h2>
@@ -226,7 +357,7 @@ export function RouteOptimizationTestPage() {
                   return (
                     <tr key={wp.destinationId}>
                       <td>{wp.destinationId}</td>
-                      <td>{dest?.name ?? '-'}</td>
+                      <td>{dest?.name ?? dest?.destinationId ?? '-'}</td>
                       <td>{wp.originalSequence ?? '-'}</td>
                       <td>
                         <strong>{wp.optimizedSequence}</strong>
@@ -252,39 +383,40 @@ export function RouteOptimizationTestPage() {
       )}
 
       {/* 입력 데이터 요약 */}
-      <div className="card">
-        <div className="card-header">
-          <h2>입력 데이터 조회</h2>
-        </div>
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>순서</th>
-                <th>배송지</th>
-                <th>위도</th>
-                <th>경도</th>
-                <th>마감</th>
-                <th>우선순위</th>
-                <th>서비스 시간</th>
-              </tr>
-            </thead>
-            <tbody>
-              {input.destinations.map((dest) => (
-                <tr key={dest.destinationId}>
-                  <td>{dest.plannedSequence}</td>
-                  <td>{dest.name}</td>
-                  <td>{dest.latitude.toFixed(4)}</td>
-                  <td>{dest.longitude.toFixed(4)}</td>
-                  <td>{dest.deadline ?? '없음'}</td>
-                  <td>{dest.priority}</td>
-                  <td>{dest.serviceTimeMinutes}분</td>
+      {input && (
+        <div className="card">
+          <div className="card-header">
+            <h2>입력 데이터 조회</h2>
+            <span style={{ fontSize: '12px', color: 'var(--gray-500)' }}>
+              배송지 {input.destinations.length}건
+            </span>
+          </div>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>배송지 ID</th>
+                  <th>위도</th>
+                  <th>경도</th>
+                  <th>마감</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {input.destinations.map((dest, idx) => (
+                  <tr key={dest.destinationId}>
+                    <td>{dest.plannedSequence ?? idx + 1}</td>
+                    <td>{dest.name ?? dest.destinationId}</td>
+                    <td>{dest.latitude.toFixed(4)}</td>
+                    <td>{dest.longitude.toFixed(4)}</td>
+                    <td>{dest.deadline ?? '없음'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

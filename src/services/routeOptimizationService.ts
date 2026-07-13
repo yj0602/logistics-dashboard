@@ -12,9 +12,19 @@ function getBaseUrl(): string {
   return `https://routes.geo.${REGION}.amazonaws.com`
 }
 
+/** Amazon Location Service OptimizeWaypoints API 제약사항 */
+const MAX_WAYPOINTS = 50
+const SERVICE_DURATION_MAX_WAYPOINTS = 20
+
 /**
  * Amazon Location Service OptimizeWaypoints API 호출
  * 배송지 방문 순서를 최적화한다.
+ *
+ * API 제약:
+ * - Waypoints 최대 50개
+ * - 20개 초과 시 ServiceDuration 등 부가 옵션 사용 불가
+ *
+ * 배송지가 50개를 초과하면 처음 50개만 최적화한다.
  */
 export async function optimizeWaypoints(
   input: RouteOptimizationInput,
@@ -24,16 +34,33 @@ export async function optimizeWaypoints(
   const optimizeFor =
     input.optimizationMode === 'SHORTEST' ? 'ShortestRoute' : 'FastestRoute'
 
+  // 50개 초과 시 앞에서 50개만 사용
+  const destinations = input.destinations.slice(0, MAX_WAYPOINTS)
+  const waypointCount = destinations.length
+  const useServiceDuration = waypointCount <= SERVICE_DURATION_MAX_WAYPOINTS
+
+  if (input.destinations.length > MAX_WAYPOINTS) {
+    console.warn(
+      `[RouteOptimization] 배송지 ${input.destinations.length}개 중 ${MAX_WAYPOINTS}개만 최적화합니다 (API 최대 제한).`,
+    )
+  }
+
   const body = {
     Origin: [input.startLocation.longitude, input.startLocation.latitude],
     OptimizeSequencingFor: optimizeFor,
     TravelMode: 'Car',
     DepartNow: true,
-    Waypoints: input.destinations.map((dest) => ({
-      Id: dest.destinationId,
-      Position: [dest.longitude, dest.latitude],
-      ServiceDuration: dest.serviceTimeMinutes * 60, // seconds
-    })),
+    Waypoints: destinations.map((dest) => {
+      const waypoint: { Id: string; Position: [number, number]; ServiceDuration?: number } = {
+        Id: dest.destinationId,
+        Position: [dest.longitude, dest.latitude],
+      }
+      // 20개 초과 시 ServiceDuration 사용 불가
+      if (useServiceDuration && dest.serviceTimeMinutes != null && dest.serviceTimeMinutes > 0) {
+        waypoint.ServiceDuration = dest.serviceTimeMinutes * 60
+      }
+      return waypoint
+    }),
   }
 
   console.log('[RouteOptimization] OptimizeWaypoints request:', JSON.stringify(body, null, 2))
@@ -55,7 +82,7 @@ export async function optimizeWaypoints(
 
   const optimizedOrder: OptimizedWaypoint[] = (data.OptimizedWaypoints ?? []).map(
     (wp: { Id: string; Position: number[] }, index: number) => {
-      const originalDest = input.destinations.find((d) => d.destinationId === wp.Id)
+      const originalDest = destinations.find((d) => d.destinationId === wp.Id)
       return {
         destinationId: wp.Id,
         optimizedSequence: index + 1,
@@ -71,9 +98,16 @@ export async function optimizeWaypoints(
   }
 }
 
+/** CalculateRoutes API Waypoints 최대 개수 */
+const MAX_ROUTE_WAYPOINTS = 23
+
 /**
  * Amazon Location Service CalculateRoutes API 호출
  * 최적화된 순서의 좌표를 연결하는 실제 도로 경로를 계산한다.
+ *
+ * API 제약: 중간 Waypoints 최대 23개 (Origin, Destination 제외)
+ * 포인트가 25개(origin+23waypoints+destination)를 초과하면
+ * 여러 구간으로 나눠서 호출 후 결과를 이어붙인다.
  */
 export async function calculateRoute(
   orderedPositions: [number, number][], // [lon, lat] 순서
@@ -82,6 +116,38 @@ export async function calculateRoute(
     throw new Error('CalculateRoutes requires at least 2 positions (origin + destination)')
   }
 
+  // 한 번에 호출 가능한 최대 포인트 수: origin(1) + waypoints(23) + destination(1) = 25
+  const maxPointsPerCall = MAX_ROUTE_WAYPOINTS + 2 // 25
+
+  if (orderedPositions.length <= maxPointsPerCall) {
+    return calculateRouteSingle(orderedPositions)
+  }
+
+  // 여러 구간으로 분할
+  const allCoordinates: [number, number][] = []
+  let startIdx = 0
+
+  while (startIdx < orderedPositions.length - 1) {
+    // 이번 구간의 끝 인덱스 (최대 25개 포인트)
+    const endIdx = Math.min(startIdx + maxPointsPerCall - 1, orderedPositions.length - 1)
+    const segment = orderedPositions.slice(startIdx, endIdx + 1)
+
+    const segmentResult = await calculateRouteSingle(segment)
+    allCoordinates.push(...segmentResult.coordinates)
+
+    // 다음 구간은 이번 구간의 마지막 포인트부터 시작 (연속성 유지)
+    startIdx = endIdx
+  }
+
+  return { coordinates: allCoordinates }
+}
+
+/**
+ * 단일 CalculateRoutes API 호출 (포인트 25개 이하)
+ */
+async function calculateRouteSingle(
+  orderedPositions: [number, number][],
+): Promise<RouteGeometry> {
   const url = `${getBaseUrl()}/v2/routes?key=${API_KEY}`
 
   const origin = orderedPositions[0]
