@@ -25,7 +25,7 @@ function App() {
           element={<PlaceholderPage title="중간 배송 투입 분석" />}
         />
         <Route
-          path="/route-optimization-test"
+          path="/route-optimization"
           element={<RouteOptimizationTestPage />}
         />
       </Route>

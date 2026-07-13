@@ -16,8 +16,7 @@ export interface DestinationData {
 }
 
 export interface RouteOptimizationInput {
-  tripId: string
-  vehicleId: string
+  driverId: string
   optimizationMode: 'FASTEST' | 'SHORTEST'
   startLocation: LocationPoint
   destinations: DestinationData[]
