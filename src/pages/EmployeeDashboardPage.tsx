@@ -64,32 +64,26 @@ export function EmployeeDashboardPage() {
 
       <section className="metrics-grid employee-metrics" aria-label="내 Hub 차량 현황">
         <SummaryMetricCard
-          description="내 Hub 도착 예정 차량"
           label="도착 예정"
           value={`${data.summary.totalVehicles}대`}
+          description="내 Hub 전체"
         />
         <SummaryMetricCard
-          description="이미 도착한 차량"
           label="도착 완료"
-          tone="green"
           value={`${data.summary.arrivedVehicles}대`}
         />
         <SummaryMetricCard
-          description="현재 이동 중인 차량"
           label="운행 중"
           value={`${data.summary.inTransitVehicles}대`}
         />
         <SummaryMetricCard
-          description="지연 중인 차량"
           label="지연 차량"
-          tone="red"
           value={`${data.summary.delayedVehicles}대`}
         />
         <SummaryMetricCard
-          description="내 Hub 기준 마지막 도착"
           label="막차 ETA"
-          tone="purple"
           value={data.summary.lastVehicleEta}
+          description="예상 도착 시간"
         />
       </section>
 

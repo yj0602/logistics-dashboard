@@ -60,34 +60,27 @@ export function AdminDashboardPage() {
         updatedAt={data.summary.predictionUpdatedAt}
       />
 
-      <section className="metrics-grid" aria-label="전체 차량 현황 요약">
+      <section className="metrics-grid metrics-grid-5" aria-label="전체 차량 현황 요약">
         <SummaryMetricCard
-          description="전체 차량 수"
           label="전체 차량"
           value={`${data.summary.totalVehicles}대`}
         />
         <SummaryMetricCard
-          description="도착한 차량 수"
           label="도착"
-          tone="green"
           value={`${data.summary.arrivedVehicles}대`}
         />
         <SummaryMetricCard
-          description="운행 중인 차량 수"
           label="운행 중"
           value={`${data.summary.inTransitVehicles}대`}
         />
         <SummaryMetricCard
-          description="지연 중인 차량 수"
           label="지연 차량"
-          tone="red"
           value={`${data.summary.delayedVehicles}대`}
         />
         <SummaryMetricCard
-          description="가장 늦은 예상 도착 시간"
           label="막차 ETA"
-          tone="purple"
           value={data.summary.lastVehicleEta}
+          description="예상 도착 시간"
         />
       </section>
 
@@ -135,35 +128,36 @@ export function AdminDashboardPage() {
       </section>
 
       <Card title="Hub 운영 현황">
-        <div className="hub-summary-grid">
-          {data.hubs.length === 0 ? (
-            <div className="empty-state">현재 조회 가능한 Hub가 없습니다.</div>
-          ) : (
-            data.hubs.map((hub) => (
-              <div className="hub-summary" key={hub.hubId}>
-                <strong>{hub.hubId}</strong>
-                <dl>
-                  <div>
-                    <dt>도착</dt>
-                    <dd>{hub.arrivedVehicles}</dd>
-                  </div>
-                  <div>
-                    <dt>운행 중</dt>
-                    <dd>{hub.inTransitVehicles}</dd>
-                  </div>
-                  <div>
-                    <dt>지연</dt>
-                    <dd>{hub.delayedVehicles}</dd>
-                  </div>
-                  <div>
-                    <dt>막차 ETA</dt>
-                    <dd>{hub.lastVehicleEta}</dd>
-                  </div>
-                </dl>
-              </div>
-            ))
-          )}
-        </div>
+        {data.hubs.length === 0 ? (
+          <div className="empty-state">현재 조회 가능한 Hub가 없습니다.</div>
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Hub</th>
+                  <th>도착</th>
+                  <th>운행 중</th>
+                  <th>지연</th>
+                  <th>막차 ETA</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.hubs.map((hub) => (
+                  <tr key={hub.hubId}>
+                    <td>{hub.hubId}</td>
+                    <td>{hub.arrivedVehicles}</td>
+                    <td>{hub.inTransitVehicles}</td>
+                    <td className={hub.delayedVehicles > 0 ? 'danger-text' : ''}>
+                      {hub.delayedVehicles}
+                    </td>
+                    <td>{hub.lastVehicleEta}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   )
