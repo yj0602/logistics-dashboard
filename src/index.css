@@ -615,12 +615,14 @@ dd {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr) 320px;
   gap: var(--space-3);
-  min-height: calc(100vh - 128px);
+  height: calc(100vh - 128px);
 }
 
 .vehicle-monitoring-layout > .map-card {
   border: 0;
   background: transparent;
+  display: flex;
+  flex-direction: column;
 }
 
 .vehicle-monitoring-layout > .map-card > .card-header {
@@ -628,9 +630,20 @@ dd {
 }
 
 .vehicle-monitoring-layout .amazon-map-container.map-full {
-  height: calc(100vh - 178px);
+  flex: 1;
+  height: 100%;
   min-height: 560px;
   margin: 0;
+}
+
+.vehicle-monitoring-layout > .vehicle-list-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.vehicle-monitoring-layout > .vehicle-detail-panel {
+  overflow-y: auto;
 }
 
 /* ===== Filter Stack ===== */
@@ -722,7 +735,7 @@ dd {
   display: flex;
   flex-direction: column;
   padding: 0;
-  max-height: calc(100vh - 420px);
+  flex: 1;
   overflow-y: auto;
 }
 
