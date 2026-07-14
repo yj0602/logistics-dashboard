@@ -36,6 +36,14 @@ function buildHubSummary(vehicles: VehicleWithEta[]): HubOperationSummary[] {
   })
 }
 
+function getCurrentTime(): string {
+  return new Date().toLocaleTimeString('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
 export async function getAdminDashboardData(): Promise<AdminDashboardData> {
   const vehicles = await getVehicles('ADMIN')
   const delayedVehicles = vehicles
@@ -52,7 +60,7 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
       ).length,
       delayedVehicles: delayedVehicles.length,
       lastVehicleEta: getLastEta(vehicles),
-      predictionUpdatedAt: '05:30',
+      predictionUpdatedAt: getCurrentTime(),
     },
     delayedVehicles,
     vehicles,
@@ -82,7 +90,7 @@ export async function getEmployeeDashboardData(
       ).length,
       delayedVehicles: delayedVehicles.length,
       lastVehicleEta: getLastEta(vehicles),
-      predictionUpdatedAt: '05:30',
+      predictionUpdatedAt: getCurrentTime(),
     },
     delayedVehicles,
     vehicles,

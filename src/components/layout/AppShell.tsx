@@ -6,6 +6,7 @@ import { TopHeader } from './TopHeader'
 
 export interface AppShellContext {
   role: UserRole
+  refreshKey: number
 }
 
 export function AppShell() {
@@ -14,6 +15,8 @@ export function AppShell() {
   const [role, setRole] = useState<UserRole>(
     location.pathname.startsWith('/employee') ? 'EMPLOYEE' : 'ADMIN',
   )
+  const [refreshKey, setRefreshKey] = useState(0)
+
   const routeRole = location.pathname.startsWith('/employee')
     ? 'EMPLOYEE'
     : location.pathname.startsWith('/admin')
@@ -34,13 +37,17 @@ export function AppShell() {
     // The role change via state/context is enough
   }
 
+  const handleRefresh = () => {
+    setRefreshKey((prev) => prev + 1)
+  }
+
   return (
     <div className="app-shell">
       <Sidebar role={activeRole} />
       <div className="app-main">
-        <TopHeader onRoleChange={handleRoleChange} role={activeRole} />
+        <TopHeader onRoleChange={handleRoleChange} onRefresh={handleRefresh} role={activeRole} />
         <main className="content">
-          <Outlet context={{ role: activeRole } satisfies AppShellContext} />
+          <Outlet context={{ role: activeRole, refreshKey } satisfies AppShellContext} />
         </main>
       </div>
     </div>

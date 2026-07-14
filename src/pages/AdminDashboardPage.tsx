@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
+import type { AppShellContext } from '../components/layout/AppShell'
 import { SummaryMetricCard } from '../components/dashboard/SummaryMetricCard'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Button } from '../components/ui/Button'
@@ -11,6 +12,7 @@ import type { AdminDashboardData } from '../types/dashboard'
 
 export function AdminDashboardPage() {
   const navigate = useNavigate()
+  const { refreshKey } = useOutletContext<AppShellContext>()
   const [data, setData] = useState<AdminDashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -31,7 +33,7 @@ export function AdminDashboardPage() {
     const timeoutId = window.setTimeout(loadDashboardData, 0)
 
     return () => window.clearTimeout(timeoutId)
-  }, [loadDashboardData])
+  }, [loadDashboardData, refreshKey])
 
   if (isLoading) {
     return <div className="loading-state">차량 정보를 불러오는 중입니다.</div>
