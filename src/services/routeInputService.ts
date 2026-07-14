@@ -1,4 +1,5 @@
 import type { RouteInputApiResponse } from '../types/routeOptimization'
+import { apiGet } from './apiClient'
 import { mockRouteOptimizationInput } from '../mocks/mockRouteOptimization'
 
 /**
@@ -21,53 +22,16 @@ export async function getVehicleRouteInput(
     throw new Error('차량 ID가 필요합니다.')
   }
 
-  const baseUrl = import.meta.env.VITE_API_BASE_URL
-  if (!baseUrl) {
-    throw new Error('VITE_API_BASE_URL 환경 변수가 설정되지 않았습니다.')
-  }
-
-  // API 호출
-  const url = `${baseUrl}/vehicles/${encodeURIComponent(vehicleId)}/route-input`
-
-  let response: Response
-  try {
-    response = await fetch(url, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      signal,
-    })
-  } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
-      throw err
-    }
-    console.error('[RouteInputService] 네트워크 오류:', err)
-    throw new Error('경로 입력 데이터 서버에 연결할 수 없습니다. 네트워크 상태를 확인해 주세요.', { cause: err })
-  }
-
-  // HTTP 오류 처리
-  if (!response.ok) {
-    const status = response.status
-    if (status === 404) {
-      throw new Error(`차량(${vehicleId})의 경로 입력 데이터가 존재하지 않습니다.`)
-    }
-    console.error('[RouteInputService] API 오류:', status)
-    throw new Error(`경로 입력 데이터 조회에 실패했습니다. (HTTP ${status})`)
-  }
-
-  // 응답 파싱
-  let data: unknown
-  try {
-    data = await response.json()
-  } catch {
-    throw new Error('API 응답을 파싱할 수 없습니다. 응답 형식을 확인해 주세요.')
-  }
+  // API 호출 (공통 apiGet 사용)
+  const path = `/vehicles/${encodeURIComponent(vehicleId)}/route-input`
+  const data = await apiGet<RouteInputApiResponse>(path, { signal })
 
   // 기본 구조 확인
   if (!data || typeof data !== 'object') {
     throw new Error('API 응답 구조가 올바르지 않습니다.')
   }
 
-  return data as RouteInputApiResponse
+  return data
 }
 
 /**
@@ -77,7 +41,6 @@ export async function getVehicleRouteInput(
 function getMockRouteInput(vehicleId: string): RouteInputApiResponse {
   const mock = mockRouteOptimizationInput
 
-  // mock 데이터를 API 응답 구조로 변환
   return {
     vehicleId: vehicleId,
     destinationCount: mock.destinations.length,

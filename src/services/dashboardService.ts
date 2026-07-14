@@ -1,10 +1,11 @@
-import { mockHubs } from '../mocks/hubs'
 import type {
   AdminDashboardData,
   EmployeeDashboardData,
   HubOperationSummary,
 } from '../types/dashboard'
+import type { Hub } from '../types/hub'
 import type { VehicleWithEta } from '../types/vehicle'
+import { getHubs } from './hubService'
 import { getVehicles } from './vehicleService'
 
 function getLastEta(vehicles: VehicleWithEta[]) {
@@ -16,8 +17,8 @@ function getLastEta(vehicles: VehicleWithEta[]) {
   return etaTimes.at(-1) ?? '-'
 }
 
-function buildHubSummary(vehicles: VehicleWithEta[]): HubOperationSummary[] {
-  return mockHubs.map((hub) => {
+function buildHubSummary(hubs: Hub[], vehicles: VehicleWithEta[]): HubOperationSummary[] {
+  return hubs.map((hub) => {
     const hubVehicles = vehicles.filter(
       (vehicle) => vehicle.destinationHubId === hub.hubId,
     )
@@ -45,7 +46,11 @@ function getCurrentTime(): string {
 }
 
 export async function getAdminDashboardData(): Promise<AdminDashboardData> {
-  const vehicles = await getVehicles('ADMIN')
+  const [vehicles, hubs] = await Promise.all([
+    getVehicles('ADMIN'),
+    getHubs(),
+  ])
+
   const delayedVehicles = vehicles
     .filter((vehicle) => vehicle.status === 'DELAYED')
     .sort((a, b) => b.eta.delayMinutes - a.eta.delayMinutes)
@@ -64,19 +69,23 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     },
     delayedVehicles,
     vehicles,
-    mapHubs: mockHubs,
-    hubs: buildHubSummary(vehicles),
+    mapHubs: hubs,
+    hubs: buildHubSummary(hubs, vehicles),
   }
 }
 
 export async function getEmployeeDashboardData(
-  employeeHubId = 'HUB-ULSAN',
+  employeeHubId = 'HUB074',
 ): Promise<EmployeeDashboardData> {
-  const vehicles = await getVehicles('EMPLOYEE', employeeHubId)
+  const [vehicles, hubs] = await Promise.all([
+    getVehicles('EMPLOYEE', employeeHubId),
+    getHubs(),
+  ])
+
   const delayedVehicles = vehicles
     .filter((vehicle) => vehicle.status === 'DELAYED')
     .sort((a, b) => b.eta.delayMinutes - a.eta.delayMinutes)
-  const hub = mockHubs.find((item) => item.hubId === employeeHubId)
+  const hub = hubs.find((item) => item.hubId === employeeHubId)
 
   return {
     hubId: employeeHubId,
@@ -94,6 +103,6 @@ export async function getEmployeeDashboardData(
     },
     delayedVehicles,
     vehicles,
-    mapHubs: mockHubs.filter((item) => item.hubId === employeeHubId),
+    mapHubs: hubs.filter((item) => item.hubId === employeeHubId),
   }
 }

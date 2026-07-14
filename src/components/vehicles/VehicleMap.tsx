@@ -51,9 +51,16 @@ function isApproaching(vehicle: VehicleWithEta) {
   return vehicle.status === 'IN_TRANSIT' && vehicle.remainingDistanceKm <= 20
 }
 
-function createHubMarkerElement(name: string, isSelected: boolean): HTMLElement {
+function createHubMarkerElement(
+  name: string,
+  isSelected: boolean,
+  arrivedVehicleIds: string[],
+): HTMLElement {
   const el = document.createElement('div')
-  el.className = `maplibre-hub-marker${isSelected ? ' is-selected' : ''}`
+  el.className = `maplibre-hub-marker${isSelected ? ' is-selected' : ''}${arrivedVehicleIds.length > 0 ? ' has-arrived' : ''}`
+  if (arrivedVehicleIds.length > 0) {
+    el.setAttribute('data-arrived-count', String(arrivedVehicleIds.length))
+  }
   el.innerHTML = `<span>H</span><strong>${name}</strong>`
   return el
 }
@@ -77,11 +84,9 @@ export function VehicleMap({
   hubs,
   compact = false,
   role = 'ADMIN',
-  employeeHubId = 'HUB-ULSAN',
+  employeeHubId = 'HUB074',
 }: VehicleMapProps) {
-  const [selectedVehicleId, setSelectedVehicleId] = useState(
-    vehicles[0]?.vehicleId ?? '',
-  )
+  const [selectedVehicleId, setSelectedVehicleId] = useState('')
   const [selectedHubId, setSelectedHubId] = useState('ALL')
   const [selectedStatus, setSelectedStatus] = useState<StatusFilter>('ALL')
   const [delayedOnly, setDelayedOnly] = useState(false)
@@ -114,8 +119,9 @@ export function VehicleMap({
 
   const selectedVehicle = useMemo(
     () =>
-      filteredVehicles.find((vehicle) => vehicle.vehicleId === selectedVehicleId) ??
-      filteredVehicles[0],
+      selectedVehicleId
+        ? filteredVehicles.find((vehicle) => vehicle.vehicleId === selectedVehicleId) ?? undefined
+        : undefined,
     [filteredVehicles, selectedVehicleId],
   )
   const lastVehicleId = useMemo(() => {
@@ -151,10 +157,10 @@ export function VehicleMap({
     [visibleHubs],
   )
 
-  // Handle vehicle selection from the list → fly to vehicle on map
+  // Handle vehicle selection from the list → fly to vehicle on map (toggle if already selected)
   const handleVehicleSelectFromList = useCallback((vehicleId: string) => {
     selectionSourceRef.current = 'list'
-    setSelectedVehicleId(vehicleId)
+    setSelectedVehicleId((prev) => (prev === vehicleId ? '' : vehicleId))
   }, [])
 
   // Handle vehicle selection from map marker → scroll list into view
@@ -201,21 +207,22 @@ export function VehicleMap({
     }
   }, [selectedVehicleId])
 
-  // Fit map bounds for compact (minimap) mode
+  // Fit map bounds: center on employee hub, or fit all hubs for admin
   useEffect(() => {
     const map = mapInstanceRef.current
-    if (!map || !mapReady || !compact) return
+    if (!map || !mapReady) return
 
     if (role === 'EMPLOYEE') {
       const hub = hubs.find((h) => h.hubId === employeeHubId)
       if (hub && hasValidMapPoint(hub.location)) {
         map.setCenter([hub.location.lng, hub.location.lat])
-        map.setZoom(100)
+        map.setZoom(compact ? 100 : 11)
       }
     } else {
+      if (!compact) return
       if (mappableHubs.length === 0) {
-        map.setCenter([127.5, 36.5])
-        map.setZoom(6.5)
+        map.setCenter([128.74, 35.60])
+        map.setZoom(9)
       } else if (mappableHubs.length === 1) {
         const hub = mappableHubs[0]
         map.setCenter([hub.location.lng, hub.location.lat])
@@ -248,13 +255,32 @@ export function VehicleMap({
     // Add hub markers (clickable in non-compact mode for admin)
     for (const hub of mappableHubs) {
       const isHubSelected = selectedHubId === hub.hubId
-      const el = createHubMarkerElement(hub.name, isHubSelected)
+      const arrivedAtHub = vehicles
+        .filter((v) => v.destinationHubId === hub.hubId && v.status === 'ARRIVED')
+        .map((v) => v.vehicleId)
+      const el = createHubMarkerElement(hub.name, isHubSelected, arrivedAtHub)
       if (!compact && role === 'ADMIN') {
         el.style.cursor = 'pointer'
         el.addEventListener('click', () => {
           handleHubSelectFromMap(hub.hubId)
         })
       }
+
+      // Popup for arrived vehicles on hover
+      let popup: maplibregl.Popup | null = null
+      if (arrivedAtHub.length > 0) {
+        const popupHtml = `<div class="hub-popup"><strong class="hub-popup-title">도착 차량 (${arrivedAtHub.length})</strong>${arrivedAtHub.map((id) => `<div class="hub-popup-item">${id}</div>`).join('')}</div>`
+        popup = new maplibregl.Popup({ offset: 10, closeButton: false, closeOnClick: false })
+          .setHTML(popupHtml)
+
+        el.addEventListener('mouseenter', () => {
+          popup!.setLngLat([hub.location.lng, hub.location.lat]).addTo(map)
+        })
+        el.addEventListener('mouseleave', () => {
+          popup!.remove()
+        })
+      }
+
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([hub.location.lng, hub.location.lat])
         .addTo(map)
@@ -463,8 +489,8 @@ export function VehicleMap({
       <Card className="map-card" title={compact ? undefined : '실시간 차량 위치'}>
         <AmazonMap
           className={compact ? 'map-compact' : 'map-full'}
-          center={[127.5, 36.5]}
-          zoom={compact ? 6.5 : 7.5}
+          center={[128.74, 35.60]}
+          zoom={compact ? 6.5 : 9}
           interactive={!compact}
           navigationControl={!compact}
           onMapReady={handleMapReady}
