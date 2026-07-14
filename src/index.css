@@ -456,6 +456,43 @@ h1, h2, h3, h4, p {
   font-weight: 400;
 }
 
+/* Metric card color variants - pastel backgrounds */
+.metric-card.metric-success {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.metric-card.metric-success strong {
+  color: #166534;
+}
+
+.metric-card.metric-info {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.metric-card.metric-info strong {
+  color: #1e40af;
+}
+
+.metric-card.metric-danger {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.metric-card.metric-danger strong {
+  color: #991b1b;
+}
+
+.metric-card.metric-warning {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.metric-card.metric-warning strong {
+  color: #92400e;
+}
+
 /* Metric icon - minimal monochrome, optional */
 .metric-icon {
   display: none;
@@ -928,6 +965,96 @@ dd {
 }
 
 /* ===== Map Markers (MapLibre) ===== */
+
+/* ─── Region Cluster Markers ─── */
+.maplibre-region-cluster {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 14px;
+  border-radius: var(--radius-lg, 12px);
+  background: var(--color-navy-900, #1e293b);
+  color: #ffffff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform 150ms, box-shadow 150ms;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 6;
+}
+
+.maplibre-region-cluster.is-compact {
+  padding: 6px 10px;
+  gap: 2px;
+}
+
+.maplibre-region-cluster:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.maplibre-region-cluster .region-name {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.maplibre-region-cluster.is-compact .region-name {
+  font-size: 11px;
+}
+
+.maplibre-region-cluster .region-hub-count {
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.maplibre-region-cluster.is-compact .region-hub-count {
+  font-size: 9px;
+}
+
+.maplibre-region-cluster .region-badges {
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.maplibre-region-cluster.is-compact .region-badges {
+  gap: 3px;
+  margin-top: 1px;
+}
+
+.region-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.maplibre-region-cluster.is-compact .region-badge {
+  min-width: 16px;
+  height: 14px;
+  padding: 0 4px;
+  font-size: 9px;
+}
+
+.region-badge.badge-in-transit {
+  background: var(--color-primary-600, #2563eb);
+}
+
+.region-badge.badge-delayed {
+  background: var(--color-danger-600, #dc2626);
+}
+
+.region-badge.badge-arrived {
+  background: var(--color-success-600, #16a34a);
+}
+
+/* ─── Individual Hub Markers ─── */
 .maplibre-hub-marker {
   display: flex;
   align-items: center;
@@ -943,25 +1070,52 @@ dd {
   z-index: 5;
 }
 
-.maplibre-hub-marker.is-selected {
-  outline: 2px solid var(--color-primary-500);
-  outline-offset: 2px;
+.maplibre-hub-marker.is-compact {
+  padding: 3px 6px;
+  gap: 3px;
+  font-size: 10px;
 }
 
-.maplibre-hub-marker.has-arrived::after {
-  content: attr(data-arrived-count);
+.maplibre-hub-marker.is-compact > span {
+  width: 14px;
+  height: 14px;
+  font-size: 8px;
+}
+
+.maplibre-hub-marker .hub-badges {
+  display: flex;
+  gap: 2px;
+  margin-left: 2px;
+}
+
+.hub-status-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  margin-left: 4px;
-  border-radius: 8px;
-  background: var(--green-600, #16a34a);
-  color: #ffffff;
-  font-size: 10px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  font-size: 9px;
   font-weight: 700;
+  color: #ffffff;
+}
+
+.hub-status-badge.badge-in-transit {
+  background: var(--color-primary-600, #2563eb);
+}
+
+.hub-status-badge.badge-delayed {
+  background: var(--color-danger-600, #dc2626);
+}
+
+.hub-status-badge.badge-arrived {
+  background: var(--color-success-600, #16a34a);
+}
+
+.maplibre-hub-marker.is-selected {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
 }
 
 .hub-popup {
@@ -973,21 +1127,35 @@ dd {
 
 .hub-popup-title {
   font-size: 11px;
-  color: var(--green-600, #16a34a);
+  color: var(--color-navy-900, #1e293b);
+  font-weight: 700;
   padding-bottom: 4px;
   border-bottom: 1px solid var(--color-gray-100, #f3f4f6);
 }
 
 .hub-popup-item {
   padding: 3px 8px;
-  background: var(--green-50, #f0fdf4);
-  color: var(--green-700, #15803d);
   font-size: 12px;
   font-weight: 600;
   border-radius: var(--radius-sm);
 }
 
-.maplibre-hub-marker span {
+.hub-popup-item.hub-popup-arrived {
+  background: var(--green-50, #f0fdf4);
+  color: var(--green-700, #15803d);
+}
+
+.hub-popup-item.hub-popup-in_transit {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.hub-popup-item.hub-popup-delayed {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.maplibre-hub-marker > span {
   display: inline-grid;
   width: 18px;
   height: 18px;

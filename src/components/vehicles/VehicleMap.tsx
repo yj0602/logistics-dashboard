@@ -30,13 +30,27 @@ const VEHICLE_STATUS_COLORS: Record<VehicleStatus, string> = {
   ARRIVED: 'var(--green-600)',
 }
 
+/** 줌 레벨 임계값: 이 값 이상이면 개별 허브 마커 표시, 미만이면 지역 클러스터 표시 */
+const REGION_ZOOM_THRESHOLD = 10.5
+
+// ─── Region Cluster Types ───
+
+interface RegionCluster {
+  region: string
+  hubs: Hub[]
+  center: { lat: number; lng: number }
+  vehicleCounts: { arrived: number; inTransit: number; delayed: number }
+}
+
+// ─── Helper Functions ───
+
 function hasValidMapPoint(point: MapPoint | null | undefined): point is MapPoint {
   return (
     typeof point?.lat === 'number' &&
     Number.isFinite(point.lat) &&
     point.lat >= -90 &&
     point.lat <= 90 &&
-    typeof point.lng === 'number' &&
+    typeof point?.lng === 'number' &&
     Number.isFinite(point.lng) &&
     point.lng >= -180 &&
     point.lng <= 180
@@ -51,17 +65,88 @@ function isApproaching(vehicle: VehicleWithEta) {
   return vehicle.status === 'IN_TRANSIT' && vehicle.remainingDistanceKm <= 20
 }
 
+function buildRegionClusters(hubs: Hub[], vehicles: VehicleWithEta[]): RegionCluster[] {
+  const regionMap = new Map<string, Hub[]>()
+  for (const hub of hubs) {
+    if (!hasValidMapPoint(hub.location)) continue
+    const existing = regionMap.get(hub.region) ?? []
+    existing.push(hub)
+    regionMap.set(hub.region, existing)
+  }
+
+  const clusters: RegionCluster[] = []
+  for (const [region, regionHubs] of regionMap) {
+    const avgLat = regionHubs.reduce((sum, h) => sum + h.location.lat, 0) / regionHubs.length
+    const avgLng = regionHubs.reduce((sum, h) => sum + h.location.lng, 0) / regionHubs.length
+
+    const hubIds = new Set(regionHubs.map((h) => h.hubId))
+    const regionVehicles = vehicles.filter((v) => hubIds.has(v.destinationHubId))
+
+    clusters.push({
+      region,
+      hubs: regionHubs,
+      center: { lat: avgLat, lng: avgLng },
+      vehicleCounts: {
+        arrived: regionVehicles.filter((v) => v.status === 'ARRIVED').length,
+        inTransit: regionVehicles.filter((v) => v.status === 'IN_TRANSIT').length,
+        delayed: regionVehicles.filter((v) => v.status === 'DELAYED').length,
+      },
+    })
+  }
+
+  return clusters
+}
+
+// ─── Marker Element Creators ───
+
+function createRegionClusterElement(cluster: RegionCluster, isCompact: boolean): HTMLElement {
+  const el = document.createElement('div')
+  el.className = `maplibre-region-cluster${isCompact ? ' is-compact' : ''}`
+
+  const { arrived, inTransit, delayed } = cluster.vehicleCounts
+  const totalVehicles = arrived + inTransit + delayed
+
+  let badgesHtml = ''
+  if (inTransit > 0) {
+    badgesHtml += `<span class="region-badge badge-in-transit">${inTransit}</span>`
+  }
+  if (delayed > 0) {
+    badgesHtml += `<span class="region-badge badge-delayed">${delayed}</span>`
+  }
+  if (arrived > 0) {
+    badgesHtml += `<span class="region-badge badge-arrived">${arrived}</span>`
+  }
+
+  el.innerHTML = `
+    <strong class="region-name">${cluster.region}</strong>
+    <span class="region-hub-count">${cluster.hubs.length}개 Hub · ${totalVehicles}대</span>
+    <div class="region-badges">${badgesHtml}</div>
+  `
+  return el
+}
+
 function createHubMarkerElement(
   name: string,
   isSelected: boolean,
-  arrivedVehicleIds: string[],
+  statusCounts: { arrived: number; inTransit: number; delayed: number },
+  isCompact: boolean,
 ): HTMLElement {
   const el = document.createElement('div')
-  el.className = `maplibre-hub-marker${isSelected ? ' is-selected' : ''}${arrivedVehicleIds.length > 0 ? ' has-arrived' : ''}`
-  if (arrivedVehicleIds.length > 0) {
-    el.setAttribute('data-arrived-count', String(arrivedVehicleIds.length))
+  const hasVehicles = statusCounts.arrived + statusCounts.inTransit + statusCounts.delayed > 0
+  el.className = `maplibre-hub-marker${isSelected ? ' is-selected' : ''}${hasVehicles ? ' has-vehicles' : ''}${isCompact ? ' is-compact' : ''}`
+
+  let badgesHtml = ''
+  if (statusCounts.inTransit > 0) {
+    badgesHtml += `<span class="hub-status-badge badge-in-transit">${statusCounts.inTransit}</span>`
   }
-  el.innerHTML = `<span>H</span><strong>${name}</strong>`
+  if (statusCounts.delayed > 0) {
+    badgesHtml += `<span class="hub-status-badge badge-delayed">${statusCounts.delayed}</span>`
+  }
+  if (statusCounts.arrived > 0) {
+    badgesHtml += `<span class="hub-status-badge badge-arrived">${statusCounts.arrived}</span>`
+  }
+
+  el.innerHTML = `<span>H</span><strong>${name}</strong>${badgesHtml ? `<div class="hub-badges">${badgesHtml}</div>` : ''}`
   return el
 }
 
@@ -79,6 +164,8 @@ function createVehicleMarkerElement(
   return el
 }
 
+// ─── Main Component ───
+
 export function VehicleMap({
   vehicles,
   hubs,
@@ -90,12 +177,15 @@ export function VehicleMap({
   const [selectedHubId, setSelectedHubId] = useState('ALL')
   const [selectedStatus, setSelectedStatus] = useState<StatusFilter>('ALL')
   const [delayedOnly, setDelayedOnly] = useState(false)
+  const [zoomLevel, setZoomLevel] = useState(compact ? 6.5 : 9)
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
   const [mapReady, setMapReady] = useState(false)
   const markersRef = useRef<maplibregl.Marker[]>([])
   const vehicleListRef = useRef<HTMLDivElement | null>(null)
-  // Track whether vehicle selection came from the list (to trigger flyTo)
   const selectionSourceRef = useRef<'list' | 'map' | 'init'>('init')
+
+  /** Whether we're in "zoomed out" mode showing region clusters (admin only) */
+  const showRegionClusters = role === 'ADMIN' && !compact && zoomLevel < REGION_ZOOM_THRESHOLD
 
   const hubScopedVehicles = useMemo(() => {
     if (role === 'EMPLOYEE') {
@@ -157,6 +247,12 @@ export function VehicleMap({
     [visibleHubs],
   )
 
+  // Region clusters for admin zoomed-out view (and compact mode)
+  const regionClusters = useMemo(
+    () => (role === 'ADMIN' ? buildRegionClusters(hubs, vehicles) : []),
+    [hubs, vehicles, role],
+  )
+
   // Handle vehicle selection from the list → fly to vehicle on map (toggle if already selected)
   const handleVehicleSelectFromList = useCallback((vehicleId: string) => {
     selectionSourceRef.current = 'list'
@@ -174,6 +270,30 @@ export function VehicleMap({
     setSelectedHubId((prev) => (prev === hubId ? 'ALL' : hubId))
   }, [])
 
+  // Handle region cluster click → zoom into the region
+  const handleRegionClick = useCallback((cluster: RegionCluster) => {
+    const map = mapInstanceRef.current
+    if (!map) return
+
+    if (cluster.hubs.length === 1) {
+      map.flyTo({
+        center: [cluster.center.lng, cluster.center.lat],
+        zoom: 12,
+        duration: 600,
+      })
+    } else {
+      const bounds = new maplibregl.LngLatBounds()
+      for (const hub of cluster.hubs) {
+        bounds.extend([hub.location.lng, hub.location.lat])
+      }
+      map.fitBounds(bounds, {
+        padding: 60,
+        maxZoom: 12,
+        duration: 600,
+      })
+    }
+  }, [])
+
   // Fly to selected vehicle when selected from the list
   useEffect(() => {
     const map = mapInstanceRef.current
@@ -187,7 +307,7 @@ export function VehicleMap({
 
     map.flyTo({
       center: [vehicle.currentLocation.lng, vehicle.currentLocation.lat],
-      zoom: Math.max(map.getZoom(), 9),
+      zoom: Math.max(map.getZoom(), 11),
       duration: 600,
     })
   }, [selectedVehicleId, filteredVehicles, mapReady, compact])
@@ -216,7 +336,7 @@ export function VehicleMap({
       const hub = hubs.find((h) => h.hubId === employeeHubId)
       if (hub && hasValidMapPoint(hub.location)) {
         map.setCenter([hub.location.lng, hub.location.lat])
-        map.setZoom(compact ? 100 : 11)
+        map.setZoom(compact ? 12 : 11)
       }
     } else {
       if (!compact) return
@@ -241,6 +361,21 @@ export function VehicleMap({
     }
   }, [compact, role, employeeHubId, hubs, mappableHubs, mapReady])
 
+  // Track zoom level changes to toggle between region clusters and individual hubs
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady) return
+
+    const handleZoom = () => {
+      setZoomLevel(map.getZoom())
+    }
+
+    map.on('zoomend', handleZoom)
+    return () => {
+      map.off('zoomend', handleZoom)
+    }
+  }, [mapReady])
+
   // Render markers on map
   useEffect(() => {
     const map = mapInstanceRef.current
@@ -252,52 +387,76 @@ export function VehicleMap({
     }
     markersRef.current = []
 
-    // Add hub markers (clickable in non-compact mode for admin)
-    for (const hub of mappableHubs) {
-      const isHubSelected = selectedHubId === hub.hubId
-      const arrivedAtHub = vehicles
-        .filter((v) => v.destinationHubId === hub.hubId && v.status === 'ARRIVED')
-        .map((v) => v.vehicleId)
-      const el = createHubMarkerElement(hub.name, isHubSelected, arrivedAtHub)
-      if (!compact && role === 'ADMIN') {
-        el.style.cursor = 'pointer'
-        el.addEventListener('click', () => {
-          handleHubSelectFromMap(hub.hubId)
-        })
+    if (showRegionClusters || (compact && role === 'ADMIN')) {
+      // ─── Region cluster mode (admin zoomed out or admin compact/dashboard) ───
+      for (const cluster of regionClusters) {
+        const el = createRegionClusterElement(cluster, compact)
+        if (!compact) {
+          el.style.cursor = 'pointer'
+          el.addEventListener('click', () => {
+            handleRegionClick(cluster)
+          })
+        }
+
+        const marker = new maplibregl.Marker({ element: el })
+          .setLngLat([cluster.center.lng, cluster.center.lat])
+          .addTo(map)
+        markersRef.current.push(marker)
+      }
+    } else {
+      // ─── Individual hub mode (zoomed in, or employee, or employee compact) ───
+      for (const hub of mappableHubs) {
+        const isHubSelected = selectedHubId === hub.hubId
+        const hubVehicles = vehicles.filter((v) => v.destinationHubId === hub.hubId)
+        const statusCounts = {
+          arrived: hubVehicles.filter((v) => v.status === 'ARRIVED').length,
+          inTransit: hubVehicles.filter((v) => v.status === 'IN_TRANSIT').length,
+          delayed: hubVehicles.filter((v) => v.status === 'DELAYED').length,
+        }
+        const el = createHubMarkerElement(hub.name, isHubSelected, statusCounts, compact && role === 'ADMIN')
+        if (!compact && role === 'ADMIN') {
+          el.style.cursor = 'pointer'
+          el.addEventListener('click', () => {
+            handleHubSelectFromMap(hub.hubId)
+          })
+        }
+
+        // Popup for vehicles on hover
+        const totalAtHub = statusCounts.arrived + statusCounts.inTransit + statusCounts.delayed
+        if (totalAtHub > 0) {
+          const hubVehiclesList = vehicles.filter((v) => v.destinationHubId === hub.hubId)
+          const popupHtml = `<div class="hub-popup"><strong class="hub-popup-title">차량 (${totalAtHub})</strong>${hubVehiclesList.map((v) => `<div class="hub-popup-item hub-popup-${v.status.toLowerCase()}">${v.vehicleId}</div>`).join('')}</div>`
+          const popup = new maplibregl.Popup({ offset: 10, closeButton: false, closeOnClick: false })
+            .setHTML(popupHtml)
+
+          el.addEventListener('mouseenter', () => {
+            popup.setLngLat([hub.location.lng, hub.location.lat]).addTo(map)
+          })
+          el.addEventListener('mouseleave', () => {
+            popup.remove()
+          })
+        }
+
+        const marker = new maplibregl.Marker({ element: el })
+          .setLngLat([hub.location.lng, hub.location.lat])
+          .addTo(map)
+        markersRef.current.push(marker)
       }
 
-      // Popup for arrived vehicles on hover
-      let popup: maplibregl.Popup | null = null
-      if (arrivedAtHub.length > 0) {
-        const popupHtml = `<div class="hub-popup"><strong class="hub-popup-title">도착 차량 (${arrivedAtHub.length})</strong>${arrivedAtHub.map((id) => `<div class="hub-popup-item">${id}</div>`).join('')}</div>`
-        popup = new maplibregl.Popup({ offset: 10, closeButton: false, closeOnClick: false })
-          .setHTML(popupHtml)
-
-        el.addEventListener('mouseenter', () => {
-          popup!.setLngLat([hub.location.lng, hub.location.lat]).addTo(map)
-        })
-        el.addEventListener('mouseleave', () => {
-          popup!.remove()
-        })
+      // Add vehicle markers (only in full map mode when zoomed in)
+      if (!compact && !showRegionClusters) {
+        for (const vehicle of mappableVehicles) {
+          const isSelected = vehicle.vehicleId === selectedVehicle?.vehicleId
+          const el = createVehicleMarkerElement(vehicle, isSelected, compact)
+          el.addEventListener('click', () => {
+            handleVehicleSelectFromMap(vehicle.vehicleId)
+          })
+          const marker = new maplibregl.Marker({ element: el })
+            .setLngLat([vehicle.currentLocation.lng, vehicle.currentLocation.lat])
+            .addTo(map)
+          markersRef.current.push(marker)
+        }
       }
-
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([hub.location.lng, hub.location.lat])
-        .addTo(map)
-      markersRef.current.push(marker)
-    }
-
-    // Add vehicle markers
-    for (const vehicle of mappableVehicles) {
-      const isSelected = vehicle.vehicleId === selectedVehicle?.vehicleId
-      const el = createVehicleMarkerElement(vehicle, isSelected, compact)
-      el.addEventListener('click', () => {
-        handleVehicleSelectFromMap(vehicle.vehicleId)
-      })
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([vehicle.currentLocation.lng, vehicle.currentLocation.lat])
-        .addTo(map)
-      markersRef.current.push(marker)
     }
 
     // Draw route for selected vehicle (non-compact only)
@@ -349,7 +508,7 @@ export function VehicleMap({
         }
       }
     }
-  }, [mappableHubs, mappableVehicles, selectedVehicle, selectedHubId, compact, mapReady, role, handleHubSelectFromMap, handleVehicleSelectFromMap])
+  }, [mappableHubs, mappableVehicles, selectedVehicle, selectedHubId, compact, mapReady, role, showRegionClusters, regionClusters, handleHubSelectFromMap, handleVehicleSelectFromMap, handleRegionClick, vehicles])
 
   const handleMapReady = useCallback((map: maplibregl.Map) => {
     mapInstanceRef.current = map

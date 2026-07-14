@@ -20,6 +20,7 @@ export interface HubOperationSummary {
 
 export interface AdminDashboardData {
   summary: DashboardSummary
+  alertHubCount: number
   delayedVehicles: VehicleWithEta[]
   vehicles: VehicleWithEta[]
   mapHubs: Hub[]

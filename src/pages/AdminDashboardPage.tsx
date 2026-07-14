@@ -70,19 +70,23 @@ export function AdminDashboardPage() {
         <SummaryMetricCard
           label="도착"
           value={`${data.summary.arrivedVehicles}대`}
+          variant="success"
         />
         <SummaryMetricCard
           label="운행 중"
           value={`${data.summary.inTransitVehicles}대`}
+          variant="info"
         />
         <SummaryMetricCard
           label="지연 차량"
           value={`${data.summary.delayedVehicles}대`}
+          variant="danger"
         />
         <SummaryMetricCard
-          label="막차 ETA"
-          value={data.summary.lastVehicleEta}
-          description="예상 도착 시간"
+          label="대응 필요 Hub"
+          value={`${data.alertHubCount}개`}
+          description="지연 15분 이상"
+          variant="warning"
         />
       </section>
 

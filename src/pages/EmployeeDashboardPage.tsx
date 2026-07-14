@@ -73,19 +73,23 @@ export function EmployeeDashboardPage() {
         <SummaryMetricCard
           label="도착 완료"
           value={`${data.summary.arrivedVehicles}대`}
+          variant="success"
         />
         <SummaryMetricCard
           label="운행 중"
           value={`${data.summary.inTransitVehicles}대`}
+          variant="info"
         />
         <SummaryMetricCard
           label="지연 차량"
           value={`${data.summary.delayedVehicles}대`}
+          variant="danger"
         />
         <SummaryMetricCard
           label="막차 ETA"
           value={data.summary.lastVehicleEta}
           description="예상 도착 시간"
+          variant="warning"
         />
       </section>
 
@@ -95,7 +99,7 @@ export function EmployeeDashboardPage() {
           title="내 Hub 차량 위치"
           action={<Button onClick={() => navigate('/vehicles')}>전체 지도 보기</Button>}
         >
-          <VehicleMap compact hubs={data.mapHubs} vehicles={data.vehicles} />
+          <VehicleMap compact role="EMPLOYEE" hubs={data.mapHubs} vehicles={data.vehicles} />
         </Card>
 
         <Card title="내 Hub 차량 현황">

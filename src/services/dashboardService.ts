@@ -45,6 +45,28 @@ function getCurrentTime(): string {
   })
 }
 
+/** 대응 필요 허브 판단: 해당 허브에 도착 예정 차량 중 하나라도 조건에 해당하면 대응 필요 */
+function countAlertHubs(hubs: Hub[], vehicles: VehicleWithEta[]): number {
+  let count = 0
+
+  for (const hub of hubs) {
+    const hubVehicles = vehicles.filter(
+      (v) => v.destinationHubId === hub.hubId && v.status !== 'ARRIVED',
+    )
+
+    const needsAttention = hubVehicles.some((vehicle) => {
+      // 조건: 최종 차량 지연 15분 이상
+      if (vehicle.eta.delayMinutes >= 15) return true
+
+      return false
+    })
+
+    if (needsAttention) count++
+  }
+
+  return count
+}
+
 export async function getAdminDashboardData(): Promise<AdminDashboardData> {
   const [vehicles, hubs] = await Promise.all([
     getVehicles('ADMIN'),
@@ -67,6 +89,7 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
       lastVehicleEta: getLastEta(vehicles),
       predictionUpdatedAt: getCurrentTime(),
     },
+    alertHubCount: countAlertHubs(hubs, vehicles),
     delayedVehicles,
     vehicles,
     mapHubs: hubs,

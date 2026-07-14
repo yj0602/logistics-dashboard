@@ -52,10 +52,10 @@ export function TopHeader({ role, onRoleChange, onRefresh }: TopHeaderProps) {
         <span>3</span>
       </div>
       <div className="user-profile">
-        <span className="avatar">{isAdmin ? 'AD' : 'UL'}</span>
+        <span className="avatar">{isAdmin ? 'AD' : 'KIM'}</span>
         <div>
-          <strong>{isAdmin ? 'admin' : 'ulsan_hub01'}</strong>
-          <small>{isAdmin ? '관리자' : '울산 Hub 직원'}</small>
+          <strong>{isAdmin ? 'admin' : 'HUB074'}</strong>
+          <small>{isAdmin ? '관리자' : '양산 Hub 직원'}</small>
         </div>
       </div>
       <Button className="header-action" onClick={onRefresh}>새로고침</Button>
