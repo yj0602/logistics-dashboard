@@ -162,13 +162,12 @@ export function RouteOptimizationTestPage() {
         .addTo(map)
       markersRef.current.push(startMarker)
 
-      // 배송지 마커들
+      // 배송지 마커들 (최적화 전 — 파란색)
       data.destinations.forEach((dest, idx) => {
         const el = document.createElement('div')
-        el.className = 'maplibre-vehicle-marker marker-in_transit'
-        el.style.cursor = 'default'
+        el.className = 'route-dest-marker route-dest-before'
         const label = dest.name ?? dest.destinationId
-        el.innerHTML = `${idx + 1}<span class="marker-sub-label">${label}</span>`
+        el.innerHTML = `<svg class="route-dest-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V21H3z"/><path d="M9 21V12h6v9"/></svg><span class="route-dest-seq">${idx + 1}</span><span class="route-dest-label">${label}</span>`
         const marker = new maplibregl.Marker({ element: el })
           .setLngLat([dest.longitude, dest.latitude])
           .addTo(map)
@@ -241,17 +240,16 @@ export function RouteOptimizationTestPage() {
     markersRef.current.slice(1).forEach((m) => m.remove())
     markersRef.current = [markersRef.current[0]] // 출발지만 유지
 
-    // 최적화된 순서대로 마커 다시 추가
+    // 최적화된 순서대로 마커 다시 추가 (초록색)
     optimizationResult.optimizedOrder.forEach((wp) => {
       const dest = data.destinations.find(
         (d) => d.destinationId === wp.destinationId,
       )
       if (!dest) return
       const el = document.createElement('div')
-      el.className = 'maplibre-vehicle-marker marker-arrived'
-      el.style.cursor = 'default'
+      el.className = 'route-dest-marker route-dest-after'
       const label = dest.name ?? dest.destinationId
-      el.innerHTML = `${wp.optimizedSequence}<span class="marker-sub-label">${label}</span>`
+      el.innerHTML = `<svg class="route-dest-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V21H3z"/><path d="M9 21V12h6v9"/></svg><span class="route-dest-seq">${wp.optimizedSequence}</span><span class="route-dest-label">${label}</span>`
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([dest.longitude, dest.latitude])
         .addTo(map)

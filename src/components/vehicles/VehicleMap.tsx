@@ -125,6 +125,12 @@ function createRegionClusterElement(cluster: RegionCluster, isCompact: boolean):
   return el
 }
 
+/** 창고 아이콘 SVG (hub marker용) */
+const HUB_ICON_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V9l9-6 9 6v12"/><path d="M9 21V12h6v9"/></svg>`
+
+/** 트럭 아이콘 SVG (vehicle marker용) */
+const VEHICLE_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`
+
 function createHubMarkerElement(
   name: string,
   isSelected: boolean,
@@ -146,7 +152,13 @@ function createHubMarkerElement(
     badgesHtml += `<span class="hub-status-badge badge-arrived">${statusCounts.arrived}</span>`
   }
 
-  el.innerHTML = `<span>H</span><strong>${name}</strong>${badgesHtml ? `<div class="hub-badges">${badgesHtml}</div>` : ''}`
+  el.innerHTML = `
+    <div class="marker-pin">${HUB_ICON_SVG}</div>
+    <div class="marker-label">
+      <span class="marker-name">${name}</span>
+      ${badgesHtml ? `<div class="hub-badges">${badgesHtml}</div>` : ''}
+    </div>
+  `
   return el
 }
 
@@ -160,7 +172,10 @@ function createVehicleMarkerElement(
   el.type = 'button'
 
   const approaching = !compact && isApproaching(vehicle)
-  el.innerHTML = `<span>${vehicle.vehicleId}${approaching ? '<small class="marker-sub-label">임박</small>' : ''}</span>`
+  el.innerHTML = `
+    <div class="marker-pin">${VEHICLE_ICON_SVG}</div>
+    <span class="marker-label">${vehicle.vehicleId}${approaching ? ' <small class="marker-sub-label">임박</small>' : ''}</span>
+  `
   return el
 }
 
