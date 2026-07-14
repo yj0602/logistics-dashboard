@@ -2,20 +2,19 @@ import maplibregl from 'maplibre-gl'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AmazonMap } from '../components/map/AmazonMap'
 import { getVehicleRouteInput } from '../services/routeInputService'
-import {
-  mapRouteInputResponse,
-  resolveDepartureHubLocation,
-} from '../services/routeInputMapper'
+import { mapRouteInputResponse } from '../services/routeInputMapper'
 import { optimizeAndCalculateRoute } from '../services/routeOptimizationService'
-import { getVehicles } from '../services/vehicleService'
 import { getHubs } from '../services/hubService'
 import type {
   RouteOptimizationInput,
   RouteOptimizationResult,
   RouteGeometry,
+  LocationPoint,
 } from '../types/routeOptimization'
-import type { Vehicle } from '../types/vehicle'
 import type { Hub } from '../types/hub'
+
+/** 직원 기본 허브 */
+const DEFAULT_HUB_ID = 'HUB074'
 
 type PageStatus = 'idle' | 'loading-input' | 'loading-optimize' | 'success' | 'error'
 
@@ -29,24 +28,20 @@ export function RouteOptimizationTestPage() {
   const [result, setResult] = useState<RouteOptimizationResult | null>(null)
   const [input, setInput] = useState<RouteOptimizationInput | null>(null)
 
-  // 차량 목록 및 허브 목록 (출발 허브 조회용)
-  const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  // 허브 목록 (출발 허브 선택용)
   const [hubs, setHubs] = useState<Hub[]>([])
+  const [selectedHubId, setSelectedHubId] = useState<string>(DEFAULT_HUB_ID)
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('')
   const [vehicleIdInput, setVehicleIdInput] = useState<string>('VEH001')
 
-  // 초기 데이터 로드: 차량 목록, 허브 목록
+  // 초기 데이터 로드: 허브 목록
   useEffect(() => {
     async function loadBaseData() {
       try {
-        const [vehicleList, hubList] = await Promise.all([
-          getVehicles('ADMIN'),
-          getHubs(),
-        ])
-        setVehicles(vehicleList)
+        const hubList = await getHubs()
         setHubs(hubList)
       } catch (err) {
-        console.error('[RouteOptimizationTest] 기본 데이터 로드 실패:', err)
+        console.error('[RouteOptimizationTest] 허브 데이터 로드 실패:', err)
       }
     }
     loadBaseData()
@@ -59,12 +54,26 @@ export function RouteOptimizationTestPage() {
     }
   }, [])
 
+  // 선택된 허브의 좌표를 반환
+  function getSelectedHubLocation(): LocationPoint | null {
+    const hub = hubs.find((h) => h.hubId === selectedHubId)
+    if (!hub) return null
+    return { latitude: hub.location.lat, longitude: hub.location.lng }
+  }
+
   // ─── 경로 입력 데이터 조회 + 최적화 실행 ───
 
   async function handleFetchAndOptimize() {
     const vehicleId = vehicleIdInput.trim()
     if (!vehicleId) {
       setError('차량 ID를 입력해 주세요.')
+      setStatus('error')
+      return
+    }
+
+    const startLocation = getSelectedHubLocation()
+    if (!startLocation) {
+      setError('출발 허브를 선택해 주세요.')
       setStatus('error')
       return
     }
@@ -90,10 +99,7 @@ export function RouteOptimizationTestPage() {
       // 1단계: API에서 경로 입력 데이터 조회
       const apiResponse = await getVehicleRouteInput(vehicleId, controller.signal)
 
-      // 2단계: 차량의 출발 허브 좌표 조회
-      const startLocation = resolveDepartureHubLocation(vehicleId, vehicles, hubs)
-
-      // 3단계: API 응답 → 최적화 입력 변환
+      // 2단계: API 응답 → 최적화 입력 변환 (허브 선택으로 출발 좌표 결정)
       const optimizationInput = mapRouteInputResponse(apiResponse, {
         startLocation,
         optimizationMode: 'FASTEST',
@@ -108,7 +114,7 @@ export function RouteOptimizationTestPage() {
         addMarkers(mapInstanceRef.current, optimizationInput)
       }
 
-      // 4단계: 최적화 실행
+      // 3단계: 최적화 실행
       setStatus('loading-optimize')
       const { optimizationResult, routeGeometry } =
         await optimizeAndCalculateRoute(optimizationInput)
@@ -263,7 +269,7 @@ export function RouteOptimizationTestPage() {
         ? '경로 최적화 실행 중...'
         : null
 
-  // 지도 중심: 입력 데이터가 있으면 출발지, 없으면 한국 중심부
+  // 지도 중심: 입력 데이터가 있으면 출발지, 없으면 한국 남동부 중심
   const mapCenter: [number, number] = input
     ? [input.startLocation.longitude, input.startLocation.latitude]
     : [128.9, 35.3]
@@ -275,21 +281,49 @@ export function RouteOptimizationTestPage() {
           <h1>최적화 경로 조회</h1>
           <p>Amazon Location Service OptimizeWaypoints + CalculateRoutes</p>
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <input
-            type="text"
-            value={vehicleIdInput}
-            onChange={(e) => setVehicleIdInput(e.target.value)}
-            placeholder="차량 ID (예: VEH001)"
-            style={{
-              padding: '6px 12px',
-              border: '1px solid var(--gray-300)',
-              borderRadius: '6px',
-              fontSize: '14px',
-              width: '160px',
-            }}
-            disabled={isLoading}
-          />
+      </div>
+
+      {/* 입력 영역 */}
+      <div className="card" style={{ padding: '16px' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px' }}>
+            배송 차량 ID
+            <input
+              type="text"
+              value={vehicleIdInput}
+              onChange={(e) => setVehicleIdInput(e.target.value)}
+              placeholder="예: VEH001"
+              style={{
+                padding: '6px 12px',
+                border: '1px solid var(--border-default)',
+                borderRadius: '6px',
+                fontSize: '14px',
+                width: '160px',
+              }}
+              disabled={isLoading}
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px' }}>
+            출발 Hub
+            <select
+              value={selectedHubId}
+              onChange={(e) => setSelectedHubId(e.target.value)}
+              style={{
+                padding: '6px 12px',
+                border: '1px solid var(--border-default)',
+                borderRadius: '6px',
+                fontSize: '14px',
+                minWidth: '200px',
+              }}
+              disabled={isLoading}
+            >
+              {hubs.map((hub) => (
+                <option key={hub.hubId} value={hub.hubId}>
+                  {hub.name} ({hub.hubId})
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             className="btn btn-primary"
             onClick={handleFetchAndOptimize}
