@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import type { UserRole } from '../../types/auth'
 import { Sidebar } from './Sidebar'
@@ -9,6 +9,9 @@ export interface AppShellContext {
   refreshKey: number
 }
 
+/** 자동 갱신 주기 (ms) */
+const AUTO_REFRESH_INTERVAL = 60_000
+
 export function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -16,6 +19,15 @@ export function AppShell() {
     location.pathname.startsWith('/employee') ? 'EMPLOYEE' : 'ADMIN',
   )
   const [refreshKey, setRefreshKey] = useState(0)
+
+  // 1분마다 자동 갱신
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setRefreshKey((prev) => prev + 1)
+    }, AUTO_REFRESH_INTERVAL)
+
+    return () => clearInterval(timer)
+  }, [])
 
   const routeRole = location.pathname.startsWith('/employee')
     ? 'EMPLOYEE'
