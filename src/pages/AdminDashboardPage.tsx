@@ -14,19 +14,17 @@ export function AdminDashboardPage() {
   const navigate = useNavigate()
   const { refreshKey } = useOutletContext<AppShellContext>()
   const [data, setData] = useState<AdminDashboardData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const loadDashboardData = useCallback(() => {
-    setIsLoading(true)
     setErrorMessage(null)
     getAdminDashboardData()
       .then(setData)
       .catch(() => {
-        setData(null)
         setErrorMessage('차량 정보를 불러오지 못했습니다.')
       })
-      .finally(() => setIsLoading(false))
+      .finally(() => setIsInitialLoading(false))
   }, [])
 
   useEffect(() => {
@@ -35,7 +33,7 @@ export function AdminDashboardPage() {
     return () => window.clearTimeout(timeoutId)
   }, [loadDashboardData, refreshKey])
 
-  if (isLoading) {
+  if (isInitialLoading) {
     return <div className="loading-state">차량 정보를 불러오는 중입니다.</div>
   }
 

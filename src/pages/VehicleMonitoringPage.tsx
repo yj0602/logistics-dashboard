@@ -22,12 +22,11 @@ export function VehicleMonitoringPage() {
   const { role, refreshKey } = useOutletContext<AppShellContext>()
   const [vehicles, setVehicles] = useState<VehicleWithEta[]>([])
   const [hubs, setHubs] = useState<Hub[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [updatedAt, setUpdatedAt] = useState(getCurrentTime())
 
   const loadMapData = useCallback(() => {
-    setIsLoading(true)
     setErrorMessage(null)
     Promise.all([getVehicles(role), getHubs()])
       .then(([vehicleData, hubData]) => {
@@ -36,11 +35,9 @@ export function VehicleMonitoringPage() {
         setUpdatedAt(getCurrentTime())
       })
       .catch(() => {
-        setVehicles([])
-        setHubs([])
         setErrorMessage('차량 위치 정보를 불러오지 못했습니다.')
       })
-      .finally(() => setIsLoading(false))
+      .finally(() => setIsInitialLoading(false))
   }, [role])
 
   useEffect(() => {
@@ -49,7 +46,7 @@ export function VehicleMonitoringPage() {
     return () => window.clearTimeout(timeoutId)
   }, [loadMapData, refreshKey])
 
-  if (isLoading) {
+  if (isInitialLoading) {
     return <div className="loading-state">차량 위치 정보를 불러오는 중입니다.</div>
   }
 

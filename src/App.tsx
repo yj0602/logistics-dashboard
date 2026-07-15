@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
 import { AdminDashboardPage } from './pages/AdminDashboardPage'
+import { DeliveryAnalysisPage } from './pages/DeliveryAnalysisPage'
 import { EmployeeDashboardPage } from './pages/EmployeeDashboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
@@ -22,7 +23,7 @@ function App() {
         />
         <Route
           path="/delivery-analysis"
-          element={<PlaceholderPage title="중간 배송 투입 분석" />}
+          element={<DeliveryAnalysisPage />}
         />
         <Route
           path="/route-optimization"
