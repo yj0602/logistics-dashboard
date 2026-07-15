@@ -2436,6 +2436,23 @@ button.sidebar-brand:hover {
   white-space: nowrap;
 }
 
+button.metric-tooltip-link {
+  all: unset;
+  color: var(--color-primary-600, #2563eb);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: var(--radius-sm, 4px);
+  padding: 1px 2px;
+  transition: background 150ms, color 150ms;
+}
+
+button.metric-tooltip-link:hover {
+  background: var(--color-primary-50, #eff6ff);
+  text-decoration: underline;
+}
+
 .metric-tooltip-value {
   color: var(--text-primary);
   font-size: 13px;

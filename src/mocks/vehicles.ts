@@ -150,7 +150,6 @@ export const mockEtaPredictions: EtaPrediction[] = [
     delayMinutes: 18,
     predictionUpdatedAt: '05:29',
     confidence: 0.87,
-    delayReason: '정체 구간 통과 중',
   },
   {
     vehicleId: 'TRUCK-03',
@@ -186,6 +185,5 @@ export const mockEtaPredictions: EtaPrediction[] = [
     delayMinutes: 24,
     predictionUpdatedAt: '05:31',
     confidence: 0.84,
-    delayReason: '정체 구간 통과 중',
   },
 ]

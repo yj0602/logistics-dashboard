@@ -25,7 +25,6 @@ export interface EtaPrediction {
   delayMinutes: number
   predictionUpdatedAt: string
   confidence?: number
-  delayReason?: string
 }
 
 export interface VehicleWithEta extends Vehicle {

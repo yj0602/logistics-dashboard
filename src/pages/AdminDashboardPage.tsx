@@ -68,17 +68,24 @@ export function AdminDashboardPage() {
   const alertHubTooltipItems = useMemo(() => {
     if (!data) return []
     return data.hubs
-      .filter((hub) => hub.delayedVehicles > 0)
       .filter((hub) => {
         const hubVehicles = data.vehicles.filter(
           (v) => v.destinationHubId === hub.hubId && v.status !== 'ARRIVED',
         )
         return hubVehicles.some((v) => v.eta.delayMinutes >= 15)
       })
-      .map((hub) => ({
-        label: hub.hubId,
-        value: '대응 필요',
-      }))
+      .map((hub) => {
+        const hubInfo = data.mapHubs.find((h) => h.hubId === hub.hubId)
+        const maxDelay = Math.max(
+          ...data.vehicles
+            .filter((v) => v.destinationHubId === hub.hubId && v.status !== 'ARRIVED')
+            .map((v) => v.eta.delayMinutes),
+        )
+        return {
+          label: hub.hubId,
+          value: `${hubInfo?.name ?? hub.hubId} · ${maxDelay}분 지연`,
+        }
+      })
   }, [data])
 
   if (isInitialLoading) {
@@ -113,28 +120,28 @@ export function AdminDashboardPage() {
           label="전체 차량"
           value={`${data.summary.totalVehicles}대`}
         />
-        <MetricTooltip items={arrivedTooltipItems}>
+        <MetricTooltip items={arrivedTooltipItems} onItemClick={(hubId) => navigate(`/vehicles?hubId=${hubId}`)}>
           <SummaryMetricCard
             label="도착"
             value={`${data.summary.arrivedVehicles}대`}
             variant="success"
           />
         </MetricTooltip>
-        <MetricTooltip items={inTransitTooltipItems}>
+        <MetricTooltip items={inTransitTooltipItems} onItemClick={(hubId) => navigate(`/vehicles?hubId=${hubId}`)}>
           <SummaryMetricCard
             label="운행 중"
             value={`${data.summary.inTransitVehicles}대`}
             variant="info"
           />
         </MetricTooltip>
-        <MetricTooltip items={delayedTooltipItems}>
+        <MetricTooltip items={delayedTooltipItems} onItemClick={(hubId) => navigate(`/vehicles?hubId=${hubId}`)}>
           <SummaryMetricCard
             label="지연 차량"
             value={`${data.summary.delayedVehicles}대`}
             variant="danger"
           />
         </MetricTooltip>
-        <MetricTooltip items={alertHubTooltipItems}>
+        <MetricTooltip items={alertHubTooltipItems} onItemClick={(hubId) => navigate(`/vehicles?hubId=${hubId}`)}>
           <SummaryMetricCard
             label="대응 필요 Hub"
             value={`${data.alertHubCount}개`}
@@ -192,7 +199,7 @@ export function AdminDashboardPage() {
                     >
                       <td>{vehicle.vehicleId}</td>
                       <td>{vehicle.destinationHubId}</td>
-                      <td>{vehicle.eta.estimatedArrivalTime ?? '-'}</td>
+                      <td>{vehicle.status === 'ARRIVED' ? '-' : (vehicle.eta.estimatedArrivalTime ?? '-')}</td>
                       <td>
                         <StatusBadge status={vehicle.status} />
                       </td>

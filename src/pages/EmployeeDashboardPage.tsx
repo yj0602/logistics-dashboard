@@ -106,21 +106,42 @@ export function EmployeeDashboardPage() {
           value={`${data.summary.totalVehicles}대`}
           description="내 Hub 전체"
         />
-        <MetricTooltip items={arrivedTooltipItems}>
+        <MetricTooltip items={arrivedTooltipItems} onItemClick={(label) => {
+          const vehicle = data.vehicles.find((v) => v.vehicleId === label)
+          if (vehicle) {
+            navigate(`/vehicles?vehicleId=${label}`)
+          } else {
+            navigate(`/vehicles?hubId=${data.hubId}`)
+          }
+        }}>
           <SummaryMetricCard
             label="도착 완료"
             value={`${data.summary.arrivedVehicles}대`}
             variant="success"
           />
         </MetricTooltip>
-        <MetricTooltip items={inTransitTooltipItems}>
+        <MetricTooltip items={inTransitTooltipItems} onItemClick={(label) => {
+          const vehicle = data.vehicles.find((v) => v.vehicleId === label)
+          if (vehicle) {
+            navigate(`/vehicles?vehicleId=${label}`)
+          } else {
+            navigate(`/vehicles?hubId=${data.hubId}`)
+          }
+        }}>
           <SummaryMetricCard
             label="운행 중"
             value={`${data.summary.inTransitVehicles}대`}
             variant="info"
           />
         </MetricTooltip>
-        <MetricTooltip items={delayedTooltipItems}>
+        <MetricTooltip items={delayedTooltipItems} onItemClick={(label) => {
+          const vehicle = data.vehicles.find((v) => v.vehicleId === label)
+          if (vehicle) {
+            navigate(`/vehicles?vehicleId=${label}`)
+          } else {
+            navigate(`/vehicles?hubId=${data.hubId}`)
+          }
+        }}>
           <SummaryMetricCard
             label="지연 차량"
             value={`${data.summary.delayedVehicles}대`}
@@ -177,7 +198,7 @@ export function EmployeeDashboardPage() {
                     >
                       <td>{vehicle.vehicleId}</td>
                       <td>{vehicle.departureHubId}</td>
-                      <td>{vehicle.eta.estimatedArrivalTime ?? '-'}</td>
+                      <td>{vehicle.status === 'ARRIVED' ? '-' : (vehicle.eta.estimatedArrivalTime ?? '-')}</td>
                       <td>
                         <StatusBadge status={vehicle.status} />
                       </td>

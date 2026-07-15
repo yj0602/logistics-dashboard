@@ -203,7 +203,7 @@ export function VehicleMap({
   const [selectedVehicleId, setSelectedVehicleId] = useState(initialVehicleId ?? '')
   const [selectedHubId, setSelectedHubId] = useState(initialHubId ?? 'ALL')
   const [selectedStatus, setSelectedStatus] = useState<StatusFilter>('ALL')
-  const [delayedOnly, setDelayedOnly] = useState(false)
+
   const [zoomLevel, setZoomLevel] = useState(compact ? 6.5 : 9)
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
   const [mapReady, setMapReady] = useState(false)
@@ -228,11 +228,10 @@ export function VehicleMap({
     return hubScopedVehicles.filter((vehicle) => {
       const matchesStatus =
         selectedStatus === 'ALL' || vehicle.status === selectedStatus
-      const matchesDelayed = !delayedOnly || vehicle.status === 'DELAYED'
 
-      return matchesStatus && matchesDelayed
+      return matchesStatus
     })
-  }, [delayedOnly, hubScopedVehicles, selectedStatus])
+  }, [hubScopedVehicles, selectedStatus])
 
   const selectedVehicle = useMemo(
     () =>
@@ -687,14 +686,7 @@ export function VehicleMap({
                 </button>
               ))}
             </div>
-            <label className="filter-toggle">
-              <input
-                checked={delayedOnly}
-                onChange={(event) => setDelayedOnly(event.target.checked)}
-                type="checkbox"
-              />
-              지연 차량만 보기
-            </label>
+
           </div>
           <div className="vehicle-list" ref={vehicleListRef}>
             {filteredVehicles.length === 0 ? (
@@ -720,11 +712,13 @@ export function VehicleMap({
                   </span>
                   <StatusBadge status={vehicle.status} />
                   <small>{getHubName(hubs, vehicle.destinationHubId)}</small>
-                  <small>
-                    ETA {vehicle.eta.estimatedArrivalTime ?? '-'}
-                    {vehicle.eta.delayMinutes > 0 &&
-                      ` · ${vehicle.eta.delayMinutes}분 지연`}
-                  </small>
+                  {vehicle.status !== 'ARRIVED' && (
+                    <small>
+                      ETA {vehicle.eta.estimatedArrivalTime ?? '-'}
+                      {vehicle.eta.delayMinutes > 0 &&
+                        ` · ${vehicle.eta.delayMinutes}분 지연`}
+                    </small>
+                  )}
                 </button>
               ))
             )}
@@ -772,18 +766,12 @@ export function VehicleMap({
               <dt>현재 위치</dt>
               <dd>{selectedVehicle.currentRoad}</dd>
             </div>
-            <div>
-              <dt>ETA</dt>
-              <dd>{selectedVehicle.eta.estimatedArrivalTime ?? '-'}</dd>
-            </div>
-            <div>
-              <dt>지연 시간</dt>
-              <dd>
-                {selectedVehicle.eta.delayMinutes > 0
-                  ? `${selectedVehicle.eta.delayMinutes}분`
-                  : '-'}
-              </dd>
-            </div>
+            {selectedVehicle.status !== 'ARRIVED' && (
+              <div>
+                <dt>ETA</dt>
+                <dd>{selectedVehicle.eta.estimatedArrivalTime ?? '-'}</dd>
+              </div>
+            )}
             <div>
               <dt>남은 거리</dt>
               <dd>{selectedVehicle.remainingDistanceKm} km</dd>
@@ -791,10 +779,6 @@ export function VehicleMap({
             <div>
               <dt>위치 갱신</dt>
               <dd>{selectedVehicle.locationUpdatedAt}</dd>
-            </div>
-            <div>
-              <dt>예측 갱신</dt>
-              <dd>{selectedVehicle.eta.predictionUpdatedAt}</dd>
             </div>
           </dl>
         </Card>

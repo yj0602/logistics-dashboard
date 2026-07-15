@@ -3,8 +3,6 @@
  *
  * 프론트 내부 타입(Hub, Vehicle 등)과 분리하여 관리한다.
  * API 응답 → 프론트 타입 변환은 서비스 계층 또는 mapper에서 수행.
- *
- * ETA 예측은 AI agent 영역이므로 이 파일에 포함하지 않는다.
  */
 
 // ─── 허브 API ───────────────────────────────────────────
@@ -61,3 +59,28 @@ export interface VehicleRoutePointApi {
 }
 
 export type GetVehiclesResponse = VehicleApiResponse[]
+
+
+// ─── ETA 예측 API (AI Agent) ────────────────────────────
+
+/**
+ * GET /vehicles/eta
+ * 전체 차량 ETA 일괄 조회 (AI 예측 결과)
+ *
+ * Endpoint: https://7c9ge0cd58.execute-api.ap-northeast-2.amazonaws.com/prod/vehicles/eta
+ */
+export interface EtaPredictionApiResponse {
+  vehicleId: string
+  /** ISO 8601 형식 예상 도착 시간. 도착 완료/예측 불가 시 null */
+  estimatedArrivalTime: string | null
+  /** 예정 시간 대비 지연 분 수 */
+  delayMinutes: number
+  /** 예측 모델이 마지막으로 결과를 갱신한 시간 (ISO 8601) */
+  predictionUpdatedAt: string
+  /** 예측 신뢰도 (0.0~1.0) */
+  confidence?: number
+}
+
+export interface GetEtaPredictionsResponse {
+  predictions: EtaPredictionApiResponse[]
+}

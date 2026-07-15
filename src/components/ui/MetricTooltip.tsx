@@ -8,9 +8,11 @@ interface TooltipItem {
 interface MetricTooltipProps {
   items: TooltipItem[]
   children: React.ReactNode
+  /** 항목의 label 클릭 시 호출되는 콜백 */
+  onItemClick?: (label: string) => void
 }
 
-export function MetricTooltip({ items, children }: MetricTooltipProps) {
+export function MetricTooltip({ items, children, onItemClick }: MetricTooltipProps) {
   const [visible, setVisible] = useState(false)
   const timeoutRef = useRef<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -46,7 +48,17 @@ export function MetricTooltip({ items, children }: MetricTooltipProps) {
           <ul className="metric-tooltip-list">
             {items.map((item) => (
               <li key={item.label}>
-                <span className="metric-tooltip-label">{item.label}</span>
+                {onItemClick ? (
+                  <button
+                    className="metric-tooltip-label metric-tooltip-link"
+                    type="button"
+                    onClick={() => onItemClick(item.label)}
+                  >
+                    {item.label}
+                  </button>
+                ) : (
+                  <span className="metric-tooltip-label">{item.label}</span>
+                )}
                 <span className="metric-tooltip-value">{item.value}</span>
               </li>
             ))}
