@@ -4,16 +4,16 @@ interface PageHeaderProps {
   updatedAt?: string
 }
 
-export function PageHeader({ title, description, updatedAt }: PageHeaderProps) {
+export function PageHeader({ title, description, }: PageHeaderProps) {
   return (
     <div className="page-header">
       <div>
         <h1>{title}</h1>
         <p>{description}</p>
       </div>
-      {updatedAt && (
+      {/* {updatedAt && (
         <span className="page-updated">마지막 업데이트: {updatedAt}</span>
-      )}
+      )} */}
     </div>
   )
 }

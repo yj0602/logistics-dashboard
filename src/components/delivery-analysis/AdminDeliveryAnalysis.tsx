@@ -7,7 +7,8 @@ import { AiSummaryCard } from './AiSummaryCard'
 import { HubDetailPanel } from './HubDetailPanel'
 import { HubOperationTable } from './HubOperationTable'
 import { getAdminAnalysis } from '../../services/deliveryAnalysisService'
-import { getEmployeesByHubId } from '../../services/employeeService'
+import { getEmployeesByHubId, getEmployeesWithOrdersByHubId, preloadEmployeeCache } from '../../services/employeeService'
+import type { IncomingOrdersApiResponse } from '../../types/api'
 import type { AdminAnalysisData, HubDetail, HubEmployee } from '../../types/deliveryAnalysis'
 import type { CurrentUser } from '../../types/auth'
 
@@ -25,6 +26,8 @@ export function AdminDeliveryAnalysis({ refreshKey }: AdminDeliveryAnalysisProps
 
   const loadData = useCallback(() => {
     setError(null)
+    // 백그라운드에서 직원 캐시 미리 로드 시작
+    preloadEmployeeCache()
     getAdminAnalysis()
       .then(setData)
       .catch(() => setError('분석 데이터를 불러오지 못했습니다.'))
@@ -41,40 +44,101 @@ export function AdminDeliveryAnalysis({ refreshKey }: AdminDeliveryAnalysisProps
     loadData()
   }
 
-  // 허브 상세 선택 시 실제 API에서 해당 허브 직원 조회
+  // 허브 상세 선택 시 직원 조회 + incoming-orders (503 시 직원만 표시)
   const handleSelectHub = useCallback(async (hubId: string) => {
     setSelectedHubId(hubId)
     setIsLoadingDetail(true)
     setHubDetailOverride(null)
 
     try {
+      // 먼저 직원 목록만 조회 (이건 캐시에서 바로 반환)
       const employees = await getEmployeesByHubId(hubId)
-      const hubRow = data?.hubs.find((h) => h.hubId === hubId)
-      const mockDetail = data?.hubDetails[hubId]
+      console.log(`[AdminAnalysis] Hub ${hubId}: ${employees.length}명 조회됨`)
 
-      // API에서 가져온 직원 목록을 HubEmployee 형태로 변환
-      const hubEmployees: HubEmployee[] = employees.map((emp: CurrentUser) => ({
-        employeeId: emp.employeeId,
-        employeeName: emp.name,
-        status: 'AVAILABLE' as const, // 실제 상태는 AI 분석 후 결정. 현재는 기본 AVAILABLE
-        recommendedArea: '-',
-        estimatedReturnTime: '-',
-        bufferMinutes: 0,
-      }))
+      const hubRow = data?.hubs.find((h) => h.hubId === hubId)
+      const remainingMinutes = hubRow?.remainingMinutes ?? 0
+
+      if (employees.length === 0) {
+        // 직원이 없는 허브
+        const detail: HubDetail = {
+          hubId,
+          hubName: hubRow?.hubName ?? hubId,
+          lastVehicleEta: hubRow?.lastVehicleEta ?? '-',
+          waitingEmployees: 0,
+          employees: [],
+          expectedDeliveries: 0,
+          riskFactors: [],
+        }
+        setHubDetailOverride(detail)
+        return
+      }
+
+      // incoming-orders 시도 (503 등 실패 시 직원만 표시)
+      let employeesWithOrders: { employee: CurrentUser; orders: IncomingOrdersApiResponse | null }[] | null = null
+      try {
+        employeesWithOrders = await getEmployeesWithOrdersByHubId(hubId)
+      } catch {
+        console.warn(`[AdminAnalysis] Hub ${hubId} incoming-orders 조회 실패, 직원 목록만 표시`)
+      }
+
+      // 직원별 데이터 구성
+      const hubEmployees: HubEmployee[] = (employeesWithOrders ?? employees.map((e) => ({ employee: e, orders: null }))).map(
+        (item) => {
+          const employee = 'employee' in item ? item.employee : item
+          const orders = 'orders' in item ? item.orders : null
+
+          let status: 'AVAILABLE' | 'CAUTION' | 'UNAVAILABLE'
+
+          if (!orders || orders.orderCount === 0) {
+            // 주문 정보 없거나 배정 없음 → 유휴시간 기반 판정
+            if (remainingMinutes >= 60) status = 'AVAILABLE'
+            else if (remainingMinutes >= 30) status = 'CAUTION'
+            else status = 'UNAVAILABLE'
+          } else {
+            const allArrived = orders.orders.every(
+              (o) => o.lineHaulVehicle.status === 'ARRIVED',
+            )
+            const someArrived = orders.orders.some(
+              (o) => o.lineHaulVehicle.status === 'ARRIVED',
+            )
+
+            if (allArrived) {
+              status = remainingMinutes >= 30 ? 'AVAILABLE' : 'CAUTION'
+            } else if (someArrived) {
+              status = 'CAUTION'
+            } else {
+              status = remainingMinutes >= 60 ? 'CAUTION' : 'UNAVAILABLE'
+            }
+          }
+
+          return {
+            employeeId: employee.employeeId,
+            employeeName: employee.name,
+            status,
+            recommendedArea: employee.assignedVehicleId ?? '-',
+            estimatedReturnTime: orders ? `${orders.orderCount}건` : '-',
+            bufferMinutes: remainingMinutes,
+          }
+        },
+      )
+
+      const totalOrders = employeesWithOrders
+        ? employeesWithOrders.reduce((sum, { orders }) => sum + (orders?.orderCount ?? 0), 0)
+        : 0
 
       const detail: HubDetail = {
         hubId,
-        hubName: hubRow?.hubName ?? mockDetail?.hubName ?? hubId,
-        lastVehicleEta: hubRow?.lastVehicleEta ?? mockDetail?.lastVehicleEta ?? '-',
+        hubName: hubRow?.hubName ?? hubId,
+        lastVehicleEta: hubRow?.lastVehicleEta ?? '-',
         waitingEmployees: hubEmployees.length,
         employees: hubEmployees,
-        expectedDeliveries: hubRow?.expectedDeliveries ?? mockDetail?.expectedDeliveries ?? 0,
-        riskFactors: mockDetail?.riskFactors ?? [],
+        expectedDeliveries: totalOrders,
+        riskFactors: employeesWithOrders ? [] : ['incoming-orders API 응답 불가 — 배송 건수 미확인'],
       }
 
       setHubDetailOverride(detail)
-    } catch {
-      // API 실패 시 기존 mock 데이터 사용
+    } catch (err) {
+      console.error(`[AdminAnalysis] Hub ${hubId} 직원 조회 실패:`, err)
       setHubDetailOverride(null)
     } finally {
       setIsLoadingDetail(false)
@@ -116,36 +180,36 @@ export function AdminDeliveryAnalysis({ refreshKey }: AdminDeliveryAnalysisProps
 
       <section className="metrics-grid metrics-grid-6" aria-label="투입 분석 요약">
         <SummaryMetricCard
-          label="대기 직원"
-          value={`${data.summary.waitingEmployees}명`}
+          label="운영 중 허브"
+          value={`${data.hubs.length}개`}
         />
         <SummaryMetricCard
-          label="투입 가능"
-          value={`${data.summary.availableEmployees}명`}
+          label="투입 가능 허브"
+          value={`${data.hubs.filter((h) => h.riskLevel === 'LOW').length}개`}
           variant="success"
         />
         <SummaryMetricCard
-          label="주의 필요"
-          value={`${data.summary.cautionEmployees}명`}
+          label="주의 필요 허브"
+          value={`${data.hubs.filter((h) => h.riskLevel === 'MEDIUM').length}개`}
           variant="warning"
         />
         <SummaryMetricCard
-          label="투입 불가"
-          value={`${data.summary.unavailableEmployees}명`}
+          label="투입 비추천 허브"
+          value={`${data.hubs.filter((h) => h.riskLevel === 'HIGH').length}개`}
           variant="danger"
         />
         <SummaryMetricCard
-          label="예상 처리 건수"
-          value={`${data.summary.expectedDeliveries}건`}
+          label="운행 중 간선차량"
+          value={`${data.summary.waitingEmployees}대`}
           variant="info"
         />
         <SummaryMetricCard
-          label="평균 활용 가능 시간"
+          label="평균 유휴시간"
           value={`${data.summary.averageIdleMinutes}분`}
         />
       </section>
 
-      <AiSummaryCard summary={data.aiSummary} />
+      <AiSummaryCard hubs={data.hubs} />
 
       <HubOperationTable
         hubs={data.hubs}

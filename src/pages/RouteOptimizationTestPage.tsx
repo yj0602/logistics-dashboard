@@ -1,5 +1,6 @@
 import maplibregl from 'maplibre-gl'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { AmazonMap } from '../components/map/AmazonMap'
 import { useAuth } from '../contexts/AuthContext'
 import { getVehicleRouteInput } from '../services/routeInputService'
@@ -17,11 +18,31 @@ import { truncateAddressToDistrict } from '../utils/addressUtils'
 
 type PageStatus = 'idle' | 'loading-input' | 'loading-optimize' | 'success' | 'error'
 
+/**
+ * 중간 배송 분석에서 FM 옵션 클릭 시 전달되는 navigation state
+ */
+interface FmOptionNav {
+  name: string
+  deliveries: string[]
+}
+
+interface RouteNavState {
+  deliveryIds?: string[]
+  vehicleId?: string
+  hubId?: string
+  optionName?: string
+  /** FM이 제안한 모든 옵션 (페이지 내에서 필터 전환용) */
+  allOptions?: FmOptionNav[]
+}
+
 export function RouteOptimizationTestPage() {
   const { user } = useAuth()
+  const location = useLocation()
+  const navState = (location.state as RouteNavState) ?? {}
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef<maplibregl.Marker[]>([])
   const abortRef = useRef<AbortController | null>(null)
+  const autoRunRef = useRef(false)
 
   const [status, setStatus] = useState<PageStatus>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -30,63 +51,26 @@ export function RouteOptimizationTestPage() {
 
   // 허브 목록 (출발 허브 선택용)
   const [hubs, setHubs] = useState<Hub[]>([])
-  const [selectedHubId, setSelectedHubId] = useState<string>(user?.hubId ?? '')
+  const [selectedHubId, setSelectedHubId] = useState<string>(navState.hubId ?? user?.hubId ?? '')
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('')
   const [vehicleIdInput, setVehicleIdInput] = useState<string>(
-    user?.assignedVehicleId ?? '',
+    navState.vehicleId ?? user?.assignedVehicleId ?? '',
   )
 
-  // 초기 데이터 로드: 허브 목록
-  useEffect(() => {
-    async function loadBaseData() {
-      try {
-        const hubList = await getHubs()
-        setHubs(hubList)
-        // 로그인 사용자의 hubId가 목록에 있으면 자동 선택
-        if (user?.hubId && hubList.some((h) => h.hubId === user.hubId)) {
-          setSelectedHubId(user.hubId)
-        } else if (hubList.length > 0 && !selectedHubId) {
-          setSelectedHubId(hubList[0].hubId)
-        }
-      } catch (err) {
-        console.error('[RouteOptimizationTest] 허브 데이터 로드 실패:', err)
-      }
-    }
-    loadBaseData()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // 네비게이션에서 전달된 배송지 필터 (초기화 가능)
+  const [filterDeliveryIds, setFilterDeliveryIds] = useState<string[] | null>(
+    navState.deliveryIds && navState.deliveryIds.length > 0 ? navState.deliveryIds : null,
+  )
+  const [filterOptionName, setFilterOptionName] = useState<string | null>(navState.optionName ?? null)
+  const [fmOptions] = useState<FmOptionNav[]>(navState.allOptions ?? [])
 
-  // 언마운트 시 진행 중인 요청 취소
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort()
-    }
-  }, [])
+  // ─── 경로 입력 데이터 조회 + 최적화 실행 (공통 함수) ───
 
-  // 선택된 허브의 좌표를 반환
-  function getSelectedHubLocation(): LocationPoint | null {
-    const hub = hubs.find((h) => h.hubId === selectedHubId)
-    if (!hub) return null
-    return { latitude: hub.location.lat, longitude: hub.location.lng }
-  }
-
-  // ─── 경로 입력 데이터 조회 + 최적화 실행 ───
-
-  async function handleFetchAndOptimize() {
-    const vehicleId = vehicleIdInput.trim()
-    if (!vehicleId) {
-      setError('차량 ID를 입력해 주세요.')
-      setStatus('error')
-      return
-    }
-
-    const startLocation = getSelectedHubLocation()
-    if (!startLocation) {
-      setError('출발 허브를 선택해 주세요.')
-      setStatus('error')
-      return
-    }
-
+  async function runOptimization(
+    vehicleId: string,
+    startLocation: LocationPoint,
+    deliveryIdFilter?: string[] | null,
+  ) {
     // 이전 요청 취소
     abortRef.current?.abort()
     const controller = new AbortController()
@@ -107,6 +91,14 @@ export function RouteOptimizationTestPage() {
     try {
       // 1단계: API에서 경로 입력 데이터 조회
       const apiResponse = await getVehicleRouteInput(vehicleId, controller.signal)
+
+      // 배송지 필터링 (FM 옵션에서 전달된 ID로 필터)
+      if (deliveryIdFilter && deliveryIdFilter.length > 0) {
+        apiResponse.destinations = apiResponse.destinations.filter((d) =>
+          deliveryIdFilter.includes(d.destinationId),
+        )
+        apiResponse.destinationCount = apiResponse.destinations.length
+      }
 
       // 2단계: API 응답 → 최적화 입력 변환 (허브 선택으로 출발 좌표 결정)
       const optimizationInput = mapRouteInputResponse(apiResponse, {
@@ -151,6 +143,105 @@ export function RouteOptimizationTestPage() {
     }
   }
 
+  // 초기 데이터 로드: 허브 목록 + 자동 실행 (네비게이션 state가 있을 때)
+  useEffect(() => {
+    async function loadBaseData() {
+      try {
+        const hubList = await getHubs()
+        setHubs(hubList)
+        // 로그인 사용자의 hubId가 목록에 있으면 자동 선택
+        const targetHubId = navState.hubId ?? user?.hubId
+        if (targetHubId && hubList.some((h) => h.hubId === targetHubId)) {
+          setSelectedHubId(targetHubId)
+        } else if (hubList.length > 0 && !selectedHubId) {
+          setSelectedHubId(hubList[0].hubId)
+        }
+
+        // 네비게이션 state가 있으면 자동 실행
+        if (filterDeliveryIds && navState.vehicleId && !autoRunRef.current) {
+          autoRunRef.current = true
+          // 허브 좌표 결정
+          const hub = hubList.find((h) => h.hubId === (navState.hubId ?? user?.hubId))
+          if (hub) {
+            await runOptimization(
+              navState.vehicleId,
+              { latitude: hub.location.lat, longitude: hub.location.lng },
+              filterDeliveryIds,
+            )
+          }
+        }
+      } catch (err) {
+        console.error('[RouteOptimizationTest] 허브 데이터 로드 실패:', err)
+      }
+    }
+    loadBaseData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 언마운트 시 진행 중인 요청 취소
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort()
+    }
+  }, [])
+
+  // 선택된 허브의 좌표를 반환
+  function getSelectedHubLocation(): LocationPoint | null {
+    const hub = hubs.find((h) => h.hubId === selectedHubId)
+    if (!hub) return null
+    return { latitude: hub.location.lat, longitude: hub.location.lng }
+  }
+
+  // ─── UI에서 수동 실행 ───
+
+  async function handleFetchAndOptimize() {
+    const vehicleId = vehicleIdInput.trim()
+    if (!vehicleId) {
+      setError('차량 ID를 입력해 주세요.')
+      setStatus('error')
+      return
+    }
+
+    const startLocation = getSelectedHubLocation()
+    if (!startLocation) {
+      setError('출발 허브를 선택해 주세요.')
+      setStatus('error')
+      return
+    }
+
+    await runOptimization(vehicleId, startLocation, filterDeliveryIds)
+  }
+
+  // ─── 필터 초기화 (전체 배송지 조회) ───
+
+  async function handleReset() {
+    setFilterDeliveryIds(null)
+    setFilterOptionName(null)
+
+    const vehicleId = vehicleIdInput.trim()
+    if (!vehicleId) return
+
+    const startLocation = getSelectedHubLocation()
+    if (!startLocation) return
+
+    await runOptimization(vehicleId, startLocation, null)
+  }
+
+  // ─── FM 옵션 필터 선택 ───
+
+  async function handleSelectOption(option: FmOptionNav) {
+    setFilterDeliveryIds(option.deliveries)
+    setFilterOptionName(option.name)
+
+    const vehicleId = vehicleIdInput.trim()
+    if (!vehicleId) return
+
+    const startLocation = getSelectedHubLocation()
+    if (!startLocation) return
+
+    await runOptimization(vehicleId, startLocation, option.deliveries)
+  }
+
   // ─── 지도 마커 관리 ───
 
   function clearMarkers() {
@@ -164,8 +255,8 @@ export function RouteOptimizationTestPage() {
 
       // 출발지 마커
       const startEl = document.createElement('div')
-      startEl.className = 'maplibre-hub-marker'
-      startEl.innerHTML = '<span>S</span> 출발지'
+      startEl.className = 'route-start-marker'
+      startEl.innerHTML = `<svg class="route-start-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V21H3z"/><path d="M9 21V12h6v9"/></svg><span class="route-start-label">출발 Hub</span>`
       const startMarker = new maplibregl.Marker({ element: startEl })
         .setLngLat([data.startLocation.longitude, data.startLocation.latitude])
         .addTo(map)
@@ -286,7 +377,11 @@ export function RouteOptimizationTestPage() {
       <div className="page-header">
         <div>
           <h1>최적화 경로 조회</h1>
-          <p>Amazon Location Service OptimizeWaypoints + CalculateRoutes</p>
+          <p>
+            {filterOptionName
+              ? `AI 추천: ${filterOptionName} (${filterDeliveryIds?.length ?? 0}건 필터)`
+              : 'Amazon Location Service OptimizeWaypoints + CalculateRoutes'}
+          </p>
         </div>
       </div>
 
@@ -339,6 +434,44 @@ export function RouteOptimizationTestPage() {
             {isLoading ? (statusMessage ?? '처리 중...') : '경로 최적화 실행'}
           </button>
         </div>
+        {/* FM 옵션 필터 바 */}
+        {fmOptions.length > 0 && (
+          <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginRight: '4px' }}>필터:</span>
+            <button
+              className={`btn btn-sm${!filterDeliveryIds ? ' btn-primary' : ''}`}
+              onClick={handleReset}
+              disabled={isLoading}
+            >
+              전체 배송지
+            </button>
+            {fmOptions.map((opt, idx) => (
+              <button
+                key={idx}
+                className={`btn btn-sm${filterOptionName === opt.name ? ' btn-primary' : ''}`}
+                onClick={() => handleSelectOption(opt)}
+                disabled={isLoading}
+              >
+                {opt.name} ({opt.deliveries.length}건)
+              </button>
+            ))}
+          </div>
+        )}
+        {/* FM 옵션이 없고 필터가 적용된 경우 (직접 전달된 경우) */}
+        {fmOptions.length === 0 && filterDeliveryIds && (
+          <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', color: 'var(--color-primary-600)' }}>
+              AI 추천 필터: {filterOptionName ?? '선택됨'} ({filterDeliveryIds.length}건)
+            </span>
+            <button
+              className="btn btn-sm"
+              onClick={handleReset}
+              disabled={isLoading}
+            >
+              전체 배송지 조회
+            </button>
+          </div>
+        )}
         {user && (
           <p style={{ margin: '8px 0 0', fontSize: '12px', color: 'var(--text-tertiary)' }}>
             로그인: {user.name} ({user.employeeId})
@@ -447,7 +580,6 @@ export function RouteOptimizationTestPage() {
                   <th>배송지 ID</th>
                   <th>위도</th>
                   <th>경도</th>
-                  <th>마감</th>
                 </tr>
               </thead>
               <tbody>
@@ -457,7 +589,6 @@ export function RouteOptimizationTestPage() {
                     <td>{truncateAddressToDistrict(dest.address) || dest.name || dest.destinationId}</td>
                     <td>{dest.latitude.toFixed(4)}</td>
                     <td>{dest.longitude.toFixed(4)}</td>
-                    <td>{dest.deadline ?? '없음'}</td>
                   </tr>
                 ))}
               </tbody>

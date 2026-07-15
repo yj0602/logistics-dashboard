@@ -84,3 +84,45 @@ export interface EtaPredictionApiResponse {
 export interface GetEtaPredictionsResponse {
   predictions: EtaPredictionApiResponse[]
 }
+
+
+// ─── 배송기사 주문/간선차량 API ────────────────────────────
+
+/**
+ * GET /employees/{employeeId}/incoming-orders
+ * 기사에게 배정된 배송 주문 및 각 주문이 적재된 간선차량 조회
+ */
+export interface IncomingOrdersApiResponse {
+  employeeId: string
+  name: string
+  role: 'DRIVER' | 'ADMIN'
+  hubId: string
+  assignedVehicleId: string | null
+  orderCount: number
+  orders: IncomingOrderApi[]
+}
+
+export interface IncomingOrderApi {
+  orderId: string
+  deliveryAddress: string
+  latitude: number
+  longitude: number
+  deadline: string
+  deliveryVehicleId: string
+  lineHaulVehicle: LineHaulVehicleApi
+}
+
+export interface LineHaulVehicleApi {
+  vehicleId: string
+  status: 'IN_TRANSIT' | 'ARRIVED'
+  departureHubId: string
+  destinationHubId: string
+  currentLocation: {
+    latitude: number
+    longitude: number
+  }
+  currentRoad: string
+  speedKmh: number
+  remainingDistanceKm: number
+  locationUpdatedAt: string
+}

@@ -218,10 +218,9 @@ export async function optimizeAndCalculateRoute(
   // 1단계: 방문 순서 최적화
   const optimizationResult = await optimizeWaypoints(input)
 
-  // 2단계: 최적화된 순서대로 좌표 배열 구성 (출발지 포함)
-  const orderedPositions: [number, number][] = [
-    [input.startLocation.longitude, input.startLocation.latitude],
-  ]
+  // 2단계: 최적화된 순서대로 좌표 배열 구성 (출발지 → 배송지들 → 출발지 복귀)
+  const startPosition: [number, number] = [input.startLocation.longitude, input.startLocation.latitude]
+  const orderedPositions: [number, number][] = [startPosition]
 
   for (const wp of optimizationResult.optimizedOrder) {
     const dest = input.destinations.find((d) => d.destinationId === wp.destinationId)
@@ -229,6 +228,9 @@ export async function optimizeAndCalculateRoute(
       orderedPositions.push([dest.longitude, dest.latitude])
     }
   }
+
+  // 왕복 경로: 마지막에 출발 허브로 복귀
+  orderedPositions.push(startPosition)
 
   // 3단계: 도로 경로 계산
   const routeGeometry = await calculateRoute(orderedPositions)

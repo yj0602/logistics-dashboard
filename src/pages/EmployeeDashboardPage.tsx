@@ -10,25 +10,34 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { VehicleMap } from '../components/vehicles/VehicleMap'
 import { useAuth } from '../contexts/AuthContext'
 import { getEmployeeDashboardData } from '../services/dashboardService'
+import { getEmployeeAnalysis } from '../services/deliveryAnalysisService'
 import type { EmployeeDashboardData } from '../types/dashboard'
+import type { EmployeeSituation } from '../types/deliveryAnalysis'
 
 export function EmployeeDashboardPage() {
   const navigate = useNavigate()
   const { refreshKey } = useOutletContext<AppShellContext>()
   const { user } = useAuth()
   const [data, setData] = useState<EmployeeDashboardData | null>(null)
+  const [situation, setSituation] = useState<EmployeeSituation | null>(null)
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const loadDashboardData = useCallback(() => {
     setErrorMessage(null)
-    getEmployeeDashboardData(user?.hubId)
-      .then(setData)
+    Promise.all([
+      getEmployeeDashboardData(user?.hubId),
+      getEmployeeAnalysis(user).then((result) => result.situation).catch(() => null),
+    ])
+      .then(([dashData, situationData]) => {
+        setData(dashData)
+        if (situationData) setSituation(situationData)
+      })
       .catch(() => {
         setErrorMessage('차량 정보를 불러오지 못했습니다.')
       })
       .finally(() => setIsInitialLoading(false))
-  }, [user?.hubId])
+  }, [user])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(loadDashboardData, 0)
@@ -73,6 +82,29 @@ export function EmployeeDashboardPage() {
     ]
   }, [data])
 
+  const lastVehicle = useMemo(() => {
+    if (!data) return null
+    const pending = data.vehicles
+      .filter((v) => v.status !== 'ARRIVED' && v.eta.estimatedArrivalTime)
+      .sort((a, b) =>
+        String(b.eta.estimatedArrivalTime).localeCompare(String(a.eta.estimatedArrivalTime)),
+      )
+    return pending[0] ?? null
+  }, [data])
+
+  const remainingMinutes = useMemo(() => {
+    if (!data) return null
+    const etaStr = data.summary.lastVehicleEta
+    if (!etaStr || etaStr === '-') return null
+    const now = new Date()
+    const [hours, minutes] = etaStr.split(':').map(Number)
+    if (isNaN(hours) || isNaN(minutes)) return null
+    const etaDate = new Date(now)
+    etaDate.setHours(hours, minutes, 0, 0)
+    const diff = Math.round((etaDate.getTime() - now.getTime()) / 60000)
+    return diff
+  }, [data])
+
   if (isInitialLoading) {
     return <div className="loading-state">차량 정보를 불러오는 중입니다.</div>
   }
@@ -91,8 +123,6 @@ export function EmployeeDashboardPage() {
   if (!data) {
     return <div className="empty-state">표시할 대시보드 데이터가 없습니다.</div>
   }
-
-  const waitingMinutes = data.summary.lastVehicleEta === '06:10' ? 40 : 0
 
   return (
     <div className="page-stack">
@@ -218,20 +248,63 @@ export function EmployeeDashboardPage() {
         </Card>
       </section>
 
-      <Card title="내 중간 배송 추천">
-        <div className="employee-recommendation">
-          <div>
-            <span>막차 도착까지</span>
-            <strong>{waitingMinutes}분</strong>
+      <Card title="내 중간 배송 추천" action={
+        lastVehicle ? <Button onClick={() => navigate('/delivery-analysis')}>상세 보기</Button> : undefined
+      }>
+        <div className="delivery-recommendation-summary">
+          <div className="recommendation-metrics">
+            <div className="recommendation-metric">
+              <span className="recommendation-metric-label">막차 ETA</span>
+              <strong className="recommendation-metric-value">
+                {situation?.estimatedArrivalTime ?? data.summary.lastVehicleEta ?? '-'}
+                {(situation?.delayMinutes ?? (lastVehicle?.eta.delayMinutes ?? 0)) > 0 && (
+                  <span className="danger-text"> (+{situation?.delayMinutes ?? lastVehicle?.eta.delayMinutes}분)</span>
+                )}
+              </strong>
+            </div>
+            <div className="recommendation-metric">
+              <span className="recommendation-metric-label">활용 가능 시간</span>
+              <strong className={`recommendation-metric-value ${(situation?.availableIdleMinutes ?? remainingMinutes ?? 999) < 20 ? 'danger-text' : ''}`}>
+                {situation
+                  ? situation.availableIdleMinutes > 0
+                    ? `${situation.availableIdleMinutes}분`
+                    : '여유 없음'
+                  : remainingMinutes !== null
+                    ? remainingMinutes > 0
+                      ? `${remainingMinutes}분`
+                      : '도착 완료'
+                    : '-'}
+              </strong>
+            </div>
+            <div className="recommendation-metric">
+              <span className="recommendation-metric-label">배정 차량</span>
+              <strong className="recommendation-metric-value">
+                {situation?.assignedVehicleId ?? '-'}
+              </strong>
+            </div>
+            <div className="recommendation-metric">
+              <span className="recommendation-metric-label">ETA 신뢰도</span>
+              <strong className="recommendation-metric-value">
+                {situation
+                  ? `${Math.round(situation.confidence * 100)}%`
+                  : '-'}
+              </strong>
+            </div>
           </div>
-          <div>
-            <span>현재 판단</span>
-            <strong>추후 구현 예정</strong>
-          </div>
-          <p>
-            중간 배송 투입 분석은 백엔드와 분석 기준 확정 후 구현합니다. 현재는
-            직원 화면에서 필요한 위치와 ETA 범위만 표시합니다.
-          </p>
+          {(situation?.availableIdleMinutes ?? remainingMinutes ?? 0) > 30 ? (
+            <p className="recommendation-hint">
+              막차 도착까지 여유 시간이 있어 중간 배송 투입이 가능합니다.
+              중간 배송 페이지에서 AI 분석 결과와 추천 경로를 확인하세요.
+            </p>
+          ) : (situation?.availableIdleMinutes ?? remainingMinutes ?? 0) > 0 ? (
+            <p className="recommendation-hint recommendation-hint-caution">
+              막차 도착이 임박합니다. 중간 배송 투입 시 주의가 필요합니다.
+            </p>
+          ) : (
+            <p className="recommendation-hint">
+              현재 대기 중인 차량이 없거나 이미 모두 도착했습니다.
+            </p>
+          )}
         </div>
       </Card>
     </div>

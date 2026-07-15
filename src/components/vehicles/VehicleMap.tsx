@@ -714,7 +714,25 @@ export function VehicleMap({
               </>
             ) : (
               <>
-                <strong>{getHubName(hubs, employeeHubId)}</strong>
+                <strong
+                  className="hub-name-link"
+                  onClick={() => {
+                    const map = mapInstanceRef.current
+                    const hub = hubs.find((h) => h.hubId === employeeHubId)
+                    if (map && hub && hasValidMapPoint(hub.location)) {
+                      map.flyTo({
+                        center: [hub.location.lng, hub.location.lat],
+                        zoom: 11,
+                        duration: 600,
+                      })
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  title="허브 위치로 이동"
+                >
+                  {getHubName(hubs, employeeHubId)}
+                </strong>
                 <span>도착 예정 {hubScopedVehicles.length}대</span>
                 <span>막차 ETA {selectedVehicle?.eta.estimatedArrivalTime ?? '-'}</span>
                 <span>

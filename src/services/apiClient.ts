@@ -61,3 +61,54 @@ export async function apiGet<T>(
 
   return data as T
 }
+
+/**
+ * POST 요청을 수행하고 JSON 응답을 반환한다.
+ * baseUrl 대신 fullUrl을 직접 지정할 수도 있다.
+ */
+export async function apiPost<T, B = unknown>(
+  path: string,
+  body: B,
+  options?: ApiRequestOptions & { fullUrl?: string },
+): Promise<T> {
+  const url = options?.fullUrl
+    ? `${options.fullUrl.replace(/\/+$/, '')}${path}`
+    : `${getBaseUrl()}${path}`
+
+  let response: Response
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: options?.signal,
+    })
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw err
+    }
+    console.error('[API] 네트워크 오류:', err)
+    throw new Error('서버에 연결할 수 없습니다. 네트워크 상태를 확인해 주세요.', { cause: err })
+  }
+
+  if (!response.ok) {
+    const status = response.status
+    if (status === 404) {
+      throw new Error(`요청한 리소스를 찾을 수 없습니다. (HTTP 404)`)
+    }
+    console.error('[API] HTTP 오류:', status, url)
+    throw new Error(`API 요청에 실패했습니다. (HTTP ${status})`)
+  }
+
+  let data: unknown
+  try {
+    data = await response.json()
+  } catch {
+    throw new Error('API 응답을 파싱할 수 없습니다.')
+  }
+
+  return data as T
+}

@@ -7,11 +7,15 @@ interface HubDetailPanelProps {
 
 const statusLabels: Record<EmployeeAvailability, string> = {
   AVAILABLE: '투입 가능',
-  CAUTION: '조건부',
-  UNAVAILABLE: '투입 불가',
+  CAUTION: '주의',
+  UNAVAILABLE: '대기 중',
 }
 
 export function HubDetailPanel({ detail, onClose }: HubDetailPanelProps) {
+  const availableCount = detail.employees.filter((e) => e.status === 'AVAILABLE').length
+  const cautionCount = detail.employees.filter((e) => e.status === 'CAUTION').length
+  const unavailableCount = detail.employees.filter((e) => e.status === 'UNAVAILABLE').length
+
   return (
     <div className="hub-detail-overlay" onClick={onClose}>
       <aside
@@ -34,60 +38,65 @@ export function HubDetailPanel({ detail, onClose }: HubDetailPanelProps) {
               <dd>{detail.lastVehicleEta}</dd>
             </div>
             <div>
-              <dt>대기 직원</dt>
+              <dt>소속 직원</dt>
               <dd>{detail.waitingEmployees}명</dd>
             </div>
             <div>
-              <dt>예상 처리 건수</dt>
+              <dt>총 배송 건수</dt>
               <dd>{detail.expectedDeliveries}건</dd>
+            </div>
+            <div>
+              <dt>투입 가능</dt>
+              <dd className="value-highlight">{availableCount}명</dd>
+            </div>
+            <div>
+              <dt>주의</dt>
+              <dd>{cautionCount}명</dd>
+            </div>
+            <div>
+              <dt>대기 중</dt>
+              <dd>{unavailableCount}명</dd>
             </div>
           </dl>
         </div>
 
         <div className="hub-detail-section">
-          <h3>투입 가능 직원 목록</h3>
-          <div className="table-wrap">
-            <table className="data-table data-table-compact">
-              <thead>
-                <tr>
-                  <th>이름</th>
-                  <th>상태</th>
-                  <th>추천 권역</th>
-                  <th>예상 복귀</th>
-                  <th>여유시간</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detail.employees.map((emp) => (
-                  <tr key={emp.employeeId}>
-                    <td>{emp.employeeName}</td>
-                    <td>
-                      <span
-                        className={`risk-badge risk-${emp.status === 'AVAILABLE' ? 'low' : emp.status === 'CAUTION' ? 'medium' : 'high'}`}
-                      >
-                        {statusLabels[emp.status]}
-                      </span>
-                    </td>
-                    <td>{emp.recommendedArea}</td>
-                    <td>{emp.estimatedReturnTime}</td>
-                    <td>{emp.bufferMinutes > 0 ? `${emp.bufferMinutes}분` : '-'}</td>
+          <h3>직원별 배송 현황</h3>
+          {detail.employees.length === 0 ? (
+            <p className="text-secondary">이 허브에 소속된 직원 정보가 없습니다.</p>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table data-table-compact">
+                <thead>
+                  <tr>
+                    <th>직원 ID</th>
+                    <th>이름</th>
+                    <th>배정 차량</th>
+                    <th>배송 건수</th>
+                    <th>투입 상태</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {detail.employees.map((emp) => (
+                    <tr key={emp.employeeId}>
+                      <td>{emp.employeeId}</td>
+                      <td>{emp.employeeName}</td>
+                      <td>{emp.recommendedArea || '-'}</td>
+                      <td>{emp.estimatedReturnTime}</td>
+                      <td>
+                        <span
+                          className={`risk-badge risk-${emp.status === 'AVAILABLE' ? 'low' : emp.status === 'CAUTION' ? 'medium' : 'high'}`}
+                        >
+                          {statusLabels[emp.status]}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-
-        {detail.riskFactors.length > 0 && (
-          <div className="hub-detail-section">
-            <h3>위험 요소</h3>
-            <ul className="risk-factor-list">
-              {detail.riskFactors.map((factor, idx) => (
-                <li key={idx}>{factor}</li>
-              ))}
-            </ul>
-          </div>
-        )}
       </aside>
     </div>
   )
