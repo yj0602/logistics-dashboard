@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import type { UserRole } from '../../types/auth'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../ui/Button'
@@ -9,26 +8,9 @@ interface TopHeaderProps {
   onRefresh: () => void
 }
 
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString('ko-KR', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
-}
-
 export function TopHeader({ role, onRefresh }: TopHeaderProps) {
   const { user } = useAuth()
   const isAdmin = role === 'ADMIN'
-  const [currentTime, setCurrentTime] = useState(() => formatTime(new Date()))
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(formatTime(new Date()))
-    }, 1_000)
-
-    return () => clearInterval(timer)
-  }, [])
 
   // 사용자 표시 정보
   const displayName = user?.name ?? (isAdmin ? '관리자' : '직원')
