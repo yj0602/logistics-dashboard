@@ -1,8 +1,11 @@
 import maplibregl from 'maplibre-gl'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useVehicleAnimation } from '../../hooks/useVehicleAnimation'
+import type { AnimatedVehicleState } from '../../hooks/useVehicleAnimation'
 import type { UserRole } from '../../types/auth'
 import type { Hub, MapPoint } from '../../types/hub'
 import type { VehicleStatus, VehicleWithEta } from '../../types/vehicle'
+import { calculateBearing as computeBearing } from '../../utils/mapUtils'
 import { AmazonMap } from '../map/AmazonMap'
 import { Card } from '../ui/Card'
 import { StatusBadge } from '../ui/StatusBadge'
@@ -134,8 +137,11 @@ function createRegionClusterElement(cluster: RegionCluster, isCompact: boolean):
 /** 창고 아이콘 SVG (hub marker용) */
 const HUB_ICON_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V9l9-6 9 6v12"/><path d="M9 21V12h6v9"/></svg>`
 
-/** 트럭 아이콘 SVG (vehicle marker용) */
+/** 트럭 아이콘 SVG (vehicle marker용 — 정차 차량) */
 const VEHICLE_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`
+
+/** 방향 화살표 SVG (이동 중 차량용) — 위(북)를 가리키며 bearing으로 회전 */
+const VEHICLE_DIRECTION_SVG = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2 L18 14 L12 11 L6 14 Z"/></svg>`
 
 function createHubMarkerElement(
   name: string,
@@ -172,20 +178,70 @@ function createVehicleMarkerElement(
   vehicle: VehicleWithEta,
   isSelected: boolean,
   compact: boolean,
+  animState?: AnimatedVehicleState | null,
 ): HTMLElement {
   const el = document.createElement('button')
-  el.className = `maplibre-vehicle-marker marker-${vehicle.status.toLowerCase()}${isSelected ? ' is-selected' : ''}`
+  const isMoving = animState?.isMoving ?? vehicle.speedKmh > 0
+  el.className = `maplibre-vehicle-marker marker-${vehicle.status.toLowerCase()}${isSelected ? ' is-selected' : ''}${isMoving ? ' is-moving' : ''}`
   el.type = 'button'
 
   const approaching = !compact && isApproaching(vehicle)
-  el.innerHTML = `
-    <div class="marker-pin">${VEHICLE_ICON_SVG}</div>
-    <span class="marker-label">${vehicle.vehicleId}${approaching ? ' <small class="marker-sub-label">임박</small>' : ''}</span>
-  `
+
+  if (isMoving && animState?.bearing != null) {
+    // Directional arrow marker for moving vehicles
+    el.innerHTML = `
+      <div class="marker-pin marker-directional" style="transform: rotate(${animState.bearing}deg)">${VEHICLE_DIRECTION_SVG}</div>
+      <span class="marker-label">${vehicle.vehicleId}${approaching ? ' <small class="marker-sub-label">임박</small>' : ''}</span>
+    `
+  } else {
+    // Static truck icon for stationary vehicles
+    el.innerHTML = `
+      <div class="marker-pin">${VEHICLE_ICON_SVG}</div>
+      <span class="marker-label">${vehicle.vehicleId}${approaching ? ' <small class="marker-sub-label">임박</small>' : ''}</span>
+    `
+  }
   return el
 }
 
 // ─── Main Component ───
+
+/** Compute initial animation state for a vehicle using its route data */
+function getInitialAnimState(vehicle: VehicleWithEta): AnimatedVehicleState | null {
+  if (vehicle.speedKmh === 0) return null
+
+  // Try to derive bearing from route: find a previous waypoint
+  const route = vehicle.route
+  const loc = vehicle.currentLocation
+  if (route.length >= 2) {
+    // Use the first route point (departure) as the "from" for bearing calculation
+    const fromPoint = route[0]
+    if (fromPoint && loc) {
+      const bearing = computeBearing(
+        { lat: fromPoint.lat, lng: fromPoint.lng },
+        { lat: loc.lat, lng: loc.lng },
+      )
+      return {
+        vehicleId: vehicle.vehicleId,
+        displayLat: loc.lat,
+        displayLng: loc.lng,
+        targetLat: loc.lat,
+        targetLng: loc.lng,
+        bearing,
+        isMoving: true,
+      }
+    }
+  }
+
+  return {
+    vehicleId: vehicle.vehicleId,
+    displayLat: loc.lat,
+    displayLng: loc.lng,
+    targetLat: loc.lat,
+    targetLng: loc.lng,
+    bearing: null,
+    isMoving: true,
+  }
+}
 
 export function VehicleMap({
   vehicles,
@@ -208,8 +264,24 @@ export function VehicleMap({
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
   const [mapReady, setMapReady] = useState(false)
   const markersRef = useRef<maplibregl.Marker[]>([])
+  const vehicleMarkersRef = useRef<Map<string, maplibregl.Marker>>(new Map())
   const vehicleListRef = useRef<HTMLDivElement | null>(null)
   const selectionSourceRef = useRef<'list' | 'map' | 'init'>('init')
+
+  // Vehicle animation: direction + smooth interpolation (only in full map mode)
+  const animationEnabled = !compact && mapReady
+  const handleAnimationFrame = useCallback((states: Map<string, AnimatedVehicleState>) => {
+    const markers = vehicleMarkersRef.current
+    for (const [vehicleId, state] of states) {
+      const marker = markers.get(vehicleId)
+      if (!marker) continue
+      if (state.isMoving) {
+        marker.setLngLat([state.displayLng, state.displayLat])
+      }
+    }
+  }, [])
+
+  useVehicleAnimation(vehicles, animationEnabled, handleAnimationFrame)
 
   /** Whether we're in "zoomed out" mode showing region clusters (admin only) */
   const showRegionClusters = role === 'ADMIN' && !compact && zoomLevel < REGION_ZOOM_THRESHOLD
@@ -354,9 +426,13 @@ export function VehicleMap({
   }, [selectedVehicleId])
 
   // Fit map bounds: center on employee hub, or fit all hubs for admin
+  // Only runs once after map is first ready (not on data refresh)
+  const initialBoundsSetRef = useRef(false)
   useEffect(() => {
     const map = mapInstanceRef.current
     if (!map || !mapReady) return
+    if (initialBoundsSetRef.current) return
+    initialBoundsSetRef.current = true
 
     if (role === 'EMPLOYEE') {
       const hub = hubs.find((h) => h.hubId === employeeHubId)
@@ -531,16 +607,20 @@ export function VehicleMap({
 
       // Add vehicle markers (only in full map mode when zoomed in)
       if (!compact && !showRegionClusters) {
+        vehicleMarkersRef.current.clear()
         for (const vehicle of mappableVehicles) {
           const isSelected = vehicle.vehicleId === selectedVehicle?.vehicleId
-          const el = createVehicleMarkerElement(vehicle, isSelected, compact)
+          // Compute initial bearing from route (previous waypoint → current location)
+          const animState = getInitialAnimState(vehicle)
+          const el = createVehicleMarkerElement(vehicle, isSelected, compact, animState)
           el.addEventListener('click', () => {
             handleVehicleSelectFromMap(vehicle.vehicleId)
           })
-          const marker = new maplibregl.Marker({ element: el })
+          const marker = new maplibregl.Marker({ element: el, rotationAlignment: 'map' })
             .setLngLat([vehicle.currentLocation.lng, vehicle.currentLocation.lat])
             .addTo(map)
           markersRef.current.push(marker)
+          vehicleMarkersRef.current.set(vehicle.vehicleId, marker)
         }
       }
     }

@@ -1269,6 +1269,49 @@ dd {
   opacity: 0.8;
 }
 
+/* ─── Directional marker (moving vehicles) ─── */
+
+.maplibre-vehicle-marker.is-moving .marker-pin.marker-directional {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  background: inherit;
+  transition: transform 0.8s ease-out;
+}
+
+.maplibre-vehicle-marker.is-moving .marker-pin.marker-directional svg {
+  width: 18px;
+  height: 18px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.2));
+}
+
+/* Subtle pulse animation for moving vehicles */
+.maplibre-vehicle-marker.is-moving .marker-pin::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  opacity: 0;
+  animation: vehicle-pulse 2s ease-out infinite;
+}
+
+@keyframes vehicle-pulse {
+  0% {
+    opacity: 0.6;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+
+.maplibre-vehicle-marker.is-moving .marker-pin {
+  position: relative;
+}
+
 .detail-marker.marker-in_transit {
   background: var(--color-primary-600);
 }
