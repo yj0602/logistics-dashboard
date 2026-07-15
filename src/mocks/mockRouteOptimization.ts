@@ -19,7 +19,7 @@ export const mockRouteOptimizationInput: RouteOptimizationInput = {
     {
       destinationId: 'DEST-001',
       name: '배송지 A',
-      address: 'Stockholm, Sweden',
+      address: '서울특별시 강남구 역삼동 123-45',
       latitude: 59.3470,
       longitude: 18.0730,
       deadline: '2026-07-10T15:00:00+02:00',
@@ -30,7 +30,7 @@ export const mockRouteOptimizationInput: RouteOptimizationInput = {
     {
       destinationId: 'DEST-002',
       name: '배송지 B',
-      address: 'Stockholm, Sweden',
+      address: '서울특별시 서초구 서초동 678-90',
       latitude: 59.3150,
       longitude: 18.0500,
       deadline: null,
@@ -41,7 +41,7 @@ export const mockRouteOptimizationInput: RouteOptimizationInput = {
     {
       destinationId: 'DEST-003',
       name: '배송지 C',
-      address: 'Stockholm, Sweden',
+      address: '경기도 성남시 분당구 정자동 45-12',
       latitude: 59.3400,
       longitude: 18.1100,
       deadline: '2026-07-10T16:30:00+02:00',
@@ -52,7 +52,7 @@ export const mockRouteOptimizationInput: RouteOptimizationInput = {
     {
       destinationId: 'DEST-004',
       name: '배송지 D',
-      address: 'Stockholm, Sweden',
+      address: '서울특별시 송파구 잠실동 234-56',
       latitude: 59.3000,
       longitude: 18.0900,
       deadline: null,

@@ -991,6 +991,12 @@ dd {
 .maplibre-region-cluster:hover {
   transform: scale(1.05);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+}
+
+/* 허브 클러스터 호버 시 maplibre 마커 래퍼가 다른 마커 위로 올라오도록 */
+.maplibregl-marker:has(.maplibre-region-cluster:hover) {
+  z-index: 9999 !important;
 }
 
 .maplibre-region-cluster .region-name {

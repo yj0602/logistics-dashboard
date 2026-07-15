@@ -147,7 +147,7 @@ export function AdminDashboardPage() {
       <section className="dashboard-grid">
         <Card
           className="dashboard-map-card"
-          title="차량 위치 지도"
+          title="허브 목록 지도"
           action={<Button onClick={() => navigate('/vehicles')}>전체 지도 보기</Button>}
         >
           <VehicleMap

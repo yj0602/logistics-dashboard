@@ -12,6 +12,7 @@ import type {
   LocationPoint,
 } from '../types/routeOptimization'
 import type { Hub } from '../types/hub'
+import { truncateAddressToDistrict } from '../utils/addressUtils'
 
 /** 직원 기본 허브 */
 const DEFAULT_HUB_ID = 'HUB074'
@@ -166,7 +167,7 @@ export function RouteOptimizationTestPage() {
       data.destinations.forEach((dest, idx) => {
         const el = document.createElement('div')
         el.className = 'route-dest-marker route-dest-before'
-        const label = dest.name ?? dest.destinationId
+        const label = truncateAddressToDistrict(dest.address) || dest.name || dest.destinationId
         el.innerHTML = `<svg class="route-dest-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V21H3z"/><path d="M9 21V12h6v9"/></svg><span class="route-dest-seq">${idx + 1}</span><span class="route-dest-label">${label}</span>`
         const marker = new maplibregl.Marker({ element: el })
           .setLngLat([dest.longitude, dest.latitude])
@@ -248,7 +249,7 @@ export function RouteOptimizationTestPage() {
       if (!dest) return
       const el = document.createElement('div')
       el.className = 'route-dest-marker route-dest-after'
-      const label = dest.name ?? dest.destinationId
+      const label = truncateAddressToDistrict(dest.address) || dest.name || dest.destinationId
       el.innerHTML = `<svg class="route-dest-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V21H3z"/><path d="M9 21V12h6v9"/></svg><span class="route-dest-seq">${wp.optimizedSequence}</span><span class="route-dest-label">${label}</span>`
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([dest.longitude, dest.latitude])
@@ -389,7 +390,7 @@ export function RouteOptimizationTestPage() {
                   return (
                     <tr key={wp.destinationId}>
                       <td>{wp.destinationId}</td>
-                      <td>{dest?.name ?? dest?.destinationId ?? '-'}</td>
+                      <td>{truncateAddressToDistrict(dest?.address) || dest?.name || wp.destinationId}</td>
                       <td>{wp.originalSequence ?? '-'}</td>
                       <td>
                         <strong>{wp.optimizedSequence}</strong>
@@ -438,7 +439,7 @@ export function RouteOptimizationTestPage() {
                 {input.destinations.map((dest, idx) => (
                   <tr key={dest.destinationId}>
                     <td>{dest.plannedSequence ?? idx + 1}</td>
-                    <td>{dest.name ?? dest.destinationId}</td>
+                    <td>{truncateAddressToDistrict(dest.address) || dest.name || dest.destinationId}</td>
                     <td>{dest.latitude.toFixed(4)}</td>
                     <td>{dest.longitude.toFixed(4)}</td>
                     <td>{dest.deadline ?? '없음'}</td>

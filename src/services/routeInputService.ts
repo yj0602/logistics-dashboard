@@ -49,6 +49,7 @@ function getMockRouteInput(vehicleId: string): RouteInputApiResponse {
       latitude: d.latitude,
       longitude: d.longitude,
       deadline: d.deadline ?? null,
+      address: d.address,
     })),
   }
 }

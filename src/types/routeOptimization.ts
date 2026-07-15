@@ -18,6 +18,8 @@ export interface RouteInputApiDestination {
   latitude: number
   longitude: number
   deadline: string | null
+  /** DB에 저장된 한글 주소 */
+  address?: string
 }
 
 // ─── 최적화 실행 입력 타입 ───

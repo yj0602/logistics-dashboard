@@ -121,7 +121,8 @@ export function mapRouteInputResponse(
     latitude: apiDest.latitude,
     longitude: apiDest.longitude,
     deadline: apiDest.deadline,
-    // API에 없는 필드는 설정하지 않음 → undefined (optional)
+    // API에서 주소가 제공되면 그대로 전달
+    address: apiDest.address,
   }))
 
   return {
