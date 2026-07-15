@@ -2346,3 +2346,106 @@ dd {
     grid-template-columns: repeat(3, 1fr);
   }
 }
+
+/* ===== Sidebar Brand as Button ===== */
+button.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 8px 16px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 150ms;
+  width: 100%;
+  text-align: left;
+}
+
+button.sidebar-brand:hover {
+  opacity: 0.85;
+}
+
+/* ===== Metric Tooltip ===== */
+.metric-tooltip-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-tooltip-wrap > .metric-card {
+  flex: 1;
+}
+
+.metric-tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  min-width: 180px;
+  max-width: 260px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-default);
+  box-shadow: var(--shadow-overlay);
+  animation: tooltip-in 150ms ease;
+}
+
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.metric-tooltip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.metric-tooltip-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.metric-tooltip-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.metric-tooltip-value {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== Clickable table cells ===== */
+.clickable-cell {
+  cursor: pointer;
+  color: var(--color-primary-600);
+  font-weight: 600;
+  transition: color 150ms;
+}
+
+.clickable-cell:hover {
+  color: var(--color-primary-700);
+  text-decoration: underline;
+}

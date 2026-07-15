@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import type { AppShellContext } from '../components/layout/AppShell'
 import { SummaryMetricCard } from '../components/dashboard/SummaryMetricCard'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { MetricTooltip } from '../components/ui/MetricTooltip'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { VehicleMap } from '../components/vehicles/VehicleMap'
 import { getAdminDashboardData } from '../services/dashboardService'
@@ -32,6 +33,53 @@ export function AdminDashboardPage() {
 
     return () => window.clearTimeout(timeoutId)
   }, [loadDashboardData, refreshKey])
+
+  // Build tooltip data: per-hub breakdown for each status
+  const arrivedTooltipItems = useMemo(() => {
+    if (!data) return []
+    return data.hubs
+      .filter((hub) => hub.arrivedVehicles > 0)
+      .map((hub) => ({
+        label: hub.hubId,
+        value: `${hub.arrivedVehicles}대`,
+      }))
+  }, [data])
+
+  const inTransitTooltipItems = useMemo(() => {
+    if (!data) return []
+    return data.hubs
+      .filter((hub) => hub.inTransitVehicles > 0)
+      .map((hub) => ({
+        label: hub.hubId,
+        value: `${hub.inTransitVehicles}대`,
+      }))
+  }, [data])
+
+  const delayedTooltipItems = useMemo(() => {
+    if (!data) return []
+    return data.hubs
+      .filter((hub) => hub.delayedVehicles > 0)
+      .map((hub) => ({
+        label: hub.hubId,
+        value: `${hub.delayedVehicles}대`,
+      }))
+  }, [data])
+
+  const alertHubTooltipItems = useMemo(() => {
+    if (!data) return []
+    return data.hubs
+      .filter((hub) => hub.delayedVehicles > 0)
+      .filter((hub) => {
+        const hubVehicles = data.vehicles.filter(
+          (v) => v.destinationHubId === hub.hubId && v.status !== 'ARRIVED',
+        )
+        return hubVehicles.some((v) => v.eta.delayMinutes >= 15)
+      })
+      .map((hub) => ({
+        label: hub.hubId,
+        value: '대응 필요',
+      }))
+  }, [data])
 
   if (isInitialLoading) {
     return <div className="loading-state">차량 정보를 불러오는 중입니다.</div>
@@ -65,27 +113,35 @@ export function AdminDashboardPage() {
           label="전체 차량"
           value={`${data.summary.totalVehicles}대`}
         />
-        <SummaryMetricCard
-          label="도착"
-          value={`${data.summary.arrivedVehicles}대`}
-          variant="success"
-        />
-        <SummaryMetricCard
-          label="운행 중"
-          value={`${data.summary.inTransitVehicles}대`}
-          variant="info"
-        />
-        <SummaryMetricCard
-          label="지연 차량"
-          value={`${data.summary.delayedVehicles}대`}
-          variant="danger"
-        />
-        <SummaryMetricCard
-          label="대응 필요 Hub"
-          value={`${data.alertHubCount}개`}
-          description="지연 15분 이상"
-          variant="warning"
-        />
+        <MetricTooltip items={arrivedTooltipItems}>
+          <SummaryMetricCard
+            label="도착"
+            value={`${data.summary.arrivedVehicles}대`}
+            variant="success"
+          />
+        </MetricTooltip>
+        <MetricTooltip items={inTransitTooltipItems}>
+          <SummaryMetricCard
+            label="운행 중"
+            value={`${data.summary.inTransitVehicles}대`}
+            variant="info"
+          />
+        </MetricTooltip>
+        <MetricTooltip items={delayedTooltipItems}>
+          <SummaryMetricCard
+            label="지연 차량"
+            value={`${data.summary.delayedVehicles}대`}
+            variant="danger"
+          />
+        </MetricTooltip>
+        <MetricTooltip items={alertHubTooltipItems}>
+          <SummaryMetricCard
+            label="대응 필요 Hub"
+            value={`${data.alertHubCount}개`}
+            description="지연 15분 이상"
+            variant="warning"
+          />
+        </MetricTooltip>
       </section>
 
       <section className="dashboard-grid">
@@ -94,7 +150,13 @@ export function AdminDashboardPage() {
           title="차량 위치 지도"
           action={<Button onClick={() => navigate('/vehicles')}>전체 지도 보기</Button>}
         >
-          <VehicleMap compact hubs={data.mapHubs} vehicles={data.vehicles} />
+          <VehicleMap
+            compact
+            hubs={data.mapHubs}
+            vehicles={data.vehicles}
+            onHubClick={(hubId) => navigate(`/vehicles?hubId=${hubId}`)}
+            onRegionClick={(region) => navigate(`/vehicles?region=${encodeURIComponent(region)}`)}
+          />
         </Card>
 
         <Card title="지연 차량 목록">
@@ -114,7 +176,20 @@ export function AdminDashboardPage() {
                 </thead>
                 <tbody>
                   {data.delayedVehicles.map((vehicle) => (
-                    <tr key={vehicle.vehicleId}>
+                    <tr
+                      key={vehicle.vehicleId}
+                      className="clickable-row"
+                      onClick={() =>
+                        navigate(`/vehicles?vehicleId=${vehicle.vehicleId}`)
+                      }
+                      role="link"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          navigate(`/vehicles?vehicleId=${vehicle.vehicleId}`)
+                        }
+                      }}
+                    >
                       <td>{vehicle.vehicleId}</td>
                       <td>{vehicle.destinationHubId}</td>
                       <td>{vehicle.eta.estimatedArrivalTime ?? '-'}</td>
@@ -149,7 +224,19 @@ export function AdminDashboardPage() {
               <tbody>
                 {data.hubs.map((hub) => (
                   <tr key={hub.hubId}>
-                    <td>{hub.hubId}</td>
+                    <td
+                      className="clickable-cell"
+                      onClick={() => navigate(`/vehicles?hubId=${hub.hubId}`)}
+                      role="link"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          navigate(`/vehicles?hubId=${hub.hubId}`)
+                        }
+                      }}
+                    >
+                      {hub.hubId}
+                    </td>
                     <td>{hub.arrivedVehicles}</td>
                     <td>{hub.inTransitVehicles}</td>
                     <td className={hub.delayedVehicles > 0 ? 'danger-text' : ''}>

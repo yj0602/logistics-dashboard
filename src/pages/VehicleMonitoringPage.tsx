@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import type { AppShellContext } from '../components/layout/AppShell'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Button } from '../components/ui/Button'
@@ -20,6 +20,10 @@ function getCurrentTime(): string {
 
 export function VehicleMonitoringPage() {
   const { role, refreshKey } = useOutletContext<AppShellContext>()
+  const [searchParams] = useSearchParams()
+  const initialVehicleId = searchParams.get('vehicleId') ?? undefined
+  const initialHubId = searchParams.get('hubId') ?? undefined
+  const initialRegion = searchParams.get('region') ?? undefined
   const [vehicles, setVehicles] = useState<VehicleWithEta[]>([])
   const [hubs, setHubs] = useState<Hub[]>([])
   const [isInitialLoading, setIsInitialLoading] = useState(true)
@@ -72,7 +76,7 @@ export function VehicleMonitoringPage() {
         title="실시간 차량 위치"
         updatedAt={updatedAt}
       />
-      <VehicleMap hubs={hubs} role={role} vehicles={vehicles} />
+      <VehicleMap hubs={hubs} role={role} vehicles={vehicles} initialVehicleId={initialVehicleId} initialHubId={initialHubId} initialRegion={initialRegion} />
     </div>
   )
 }

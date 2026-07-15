@@ -13,6 +13,12 @@ interface VehicleMapProps {
   compact?: boolean
   role?: UserRole
   employeeHubId?: string
+  initialVehicleId?: string
+  initialHubId?: string
+  initialRegion?: string
+  onHubClick?: (hubId: string) => void
+  onRegionClick?: (region: string) => void
+  onVehicleClick?: (vehicleId: string) => void
 }
 
 type StatusFilter = 'ALL' | VehicleStatus
@@ -187,9 +193,15 @@ export function VehicleMap({
   compact = false,
   role = 'ADMIN',
   employeeHubId = 'HUB074',
+  initialVehicleId,
+  initialHubId,
+  initialRegion,
+  onHubClick,
+  onRegionClick,
+  onVehicleClick,
 }: VehicleMapProps) {
-  const [selectedVehicleId, setSelectedVehicleId] = useState('')
-  const [selectedHubId, setSelectedHubId] = useState('ALL')
+  const [selectedVehicleId, setSelectedVehicleId] = useState(initialVehicleId ?? '')
+  const [selectedHubId, setSelectedHubId] = useState(initialHubId ?? 'ALL')
   const [selectedStatus, setSelectedStatus] = useState<StatusFilter>('ALL')
   const [delayedOnly, setDelayedOnly] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(compact ? 6.5 : 9)
@@ -391,6 +403,54 @@ export function VehicleMap({
     }
   }, [mapReady])
 
+  // Fly to initial vehicle or hub from query params
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady || compact) return
+
+    if (initialVehicleId) {
+      const vehicle = vehicles.find((v) => v.vehicleId === initialVehicleId)
+      if (vehicle?.currentLocation) {
+        selectionSourceRef.current = 'list'
+        map.flyTo({
+          center: [vehicle.currentLocation.lng, vehicle.currentLocation.lat],
+          zoom: 12,
+          duration: 800,
+        })
+      }
+    } else if (initialRegion) {
+      const regionHubs = hubs.filter((h) => h.region === initialRegion && h.location)
+      if (regionHubs.length === 1) {
+        map.flyTo({
+          center: [regionHubs[0].location.lng, regionHubs[0].location.lat],
+          zoom: 11,
+          duration: 800,
+        })
+      } else if (regionHubs.length > 1) {
+        const bounds = new maplibregl.LngLatBounds()
+        for (const hub of regionHubs) {
+          bounds.extend([hub.location.lng, hub.location.lat])
+        }
+        map.fitBounds(bounds, {
+          padding: 60,
+          maxZoom: 12,
+          duration: 800,
+        })
+      }
+    } else if (initialHubId) {
+      const hub = hubs.find((h) => h.hubId === initialHubId)
+      if (hub?.location) {
+        map.flyTo({
+          center: [hub.location.lng, hub.location.lat],
+          zoom: 12,
+          duration: 800,
+        })
+      }
+    }
+    // Only run once when map becomes ready
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady])
+
   // Render markers on map
   useEffect(() => {
     const map = mapInstanceRef.current
@@ -410,6 +470,12 @@ export function VehicleMap({
           el.style.cursor = 'pointer'
           el.addEventListener('click', () => {
             handleRegionClick(cluster)
+          })
+        }
+        if (compact && onRegionClick) {
+          el.style.cursor = 'pointer'
+          el.addEventListener('click', () => {
+            onRegionClick(cluster.region)
           })
         }
 
@@ -433,6 +499,12 @@ export function VehicleMap({
           el.style.cursor = 'pointer'
           el.addEventListener('click', () => {
             handleHubSelectFromMap(hub.hubId)
+          })
+        }
+        if (compact && onHubClick) {
+          el.style.cursor = 'pointer'
+          el.addEventListener('click', () => {
+            onHubClick(hub.hubId)
           })
         }
 
@@ -523,7 +595,7 @@ export function VehicleMap({
         }
       }
     }
-  }, [mappableHubs, mappableVehicles, selectedVehicle, selectedHubId, compact, mapReady, role, showRegionClusters, regionClusters, handleHubSelectFromMap, handleVehicleSelectFromMap, handleRegionClick, vehicles])
+  }, [mappableHubs, mappableVehicles, selectedVehicle, selectedHubId, compact, mapReady, role, showRegionClusters, regionClusters, handleHubSelectFromMap, handleVehicleSelectFromMap, handleRegionClick, vehicles, onHubClick, onRegionClick, onVehicleClick])
 
   const handleMapReady = useCallback((map: maplibregl.Map) => {
     mapInstanceRef.current = map

@@ -1,7 +1,8 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import type { UserRole } from '../../types/auth'
 
 export function Sidebar({ role }: { role: UserRole }) {
+  const navigate = useNavigate()
   const dashboardPath =
     role === 'ADMIN' ? '/admin/dashboard' : '/employee/dashboard'
   const navItems = [
@@ -15,10 +16,15 @@ export function Sidebar({ role }: { role: UserRole }) {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-brand">
+      <button
+        className="sidebar-brand"
+        onClick={() => navigate(dashboardPath)}
+        type="button"
+        aria-label="대시보드로 이동"
+      >
         <span className="brand-mark">LC</span>
         <span>물류 관제 시스템</span>
-      </div>
+      </button>
       <nav className="sidebar-nav" aria-label="주요 메뉴">
         {navItems.map((item) => (
           <NavLink
