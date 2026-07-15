@@ -7,7 +7,9 @@ import { AiSummaryCard } from './AiSummaryCard'
 import { HubDetailPanel } from './HubDetailPanel'
 import { HubOperationTable } from './HubOperationTable'
 import { getAdminAnalysis } from '../../services/deliveryAnalysisService'
-import type { AdminAnalysisData } from '../../types/deliveryAnalysis'
+import { getEmployeesByHubId } from '../../services/employeeService'
+import type { AdminAnalysisData, HubDetail, HubEmployee } from '../../types/deliveryAnalysis'
+import type { CurrentUser } from '../../types/auth'
 
 interface AdminDeliveryAnalysisProps {
   refreshKey: number
@@ -18,6 +20,8 @@ export function AdminDeliveryAnalysis({ refreshKey }: AdminDeliveryAnalysisProps
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedHubId, setSelectedHubId] = useState<string | null>(null)
+  const [hubDetailOverride, setHubDetailOverride] = useState<HubDetail | null>(null)
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false)
 
   const loadData = useCallback(() => {
     setError(null)
@@ -36,6 +40,46 @@ export function AdminDeliveryAnalysis({ refreshKey }: AdminDeliveryAnalysisProps
     setIsLoading(true)
     loadData()
   }
+
+  // 허브 상세 선택 시 실제 API에서 해당 허브 직원 조회
+  const handleSelectHub = useCallback(async (hubId: string) => {
+    setSelectedHubId(hubId)
+    setIsLoadingDetail(true)
+    setHubDetailOverride(null)
+
+    try {
+      const employees = await getEmployeesByHubId(hubId)
+      const hubRow = data?.hubs.find((h) => h.hubId === hubId)
+      const mockDetail = data?.hubDetails[hubId]
+
+      // API에서 가져온 직원 목록을 HubEmployee 형태로 변환
+      const hubEmployees: HubEmployee[] = employees.map((emp: CurrentUser) => ({
+        employeeId: emp.employeeId,
+        employeeName: emp.name,
+        status: 'AVAILABLE' as const, // 실제 상태는 AI 분석 후 결정. 현재는 기본 AVAILABLE
+        recommendedArea: '-',
+        estimatedReturnTime: '-',
+        bufferMinutes: 0,
+      }))
+
+      const detail: HubDetail = {
+        hubId,
+        hubName: hubRow?.hubName ?? mockDetail?.hubName ?? hubId,
+        lastVehicleEta: hubRow?.lastVehicleEta ?? mockDetail?.lastVehicleEta ?? '-',
+        waitingEmployees: hubEmployees.length,
+        employees: hubEmployees,
+        expectedDeliveries: hubRow?.expectedDeliveries ?? mockDetail?.expectedDeliveries ?? 0,
+        riskFactors: mockDetail?.riskFactors ?? [],
+      }
+
+      setHubDetailOverride(detail)
+    } catch {
+      // API 실패 시 기존 mock 데이터 사용
+      setHubDetailOverride(null)
+    } finally {
+      setIsLoadingDetail(false)
+    }
+  }, [data])
 
   if (isLoading) {
     return <div className="loading-state">분석 데이터를 불러오는 중입니다.</div>
@@ -56,7 +100,7 @@ export function AdminDeliveryAnalysis({ refreshKey }: AdminDeliveryAnalysisProps
     return <div className="empty-state">표시할 분석 데이터가 없습니다.</div>
   }
 
-  const selectedDetail = selectedHubId ? data.hubDetails[selectedHubId] : null
+  const selectedDetail = hubDetailOverride ?? (selectedHubId ? data.hubDetails[selectedHubId] : null)
 
   return (
     <div className="page-stack">
@@ -105,13 +149,17 @@ export function AdminDeliveryAnalysis({ refreshKey }: AdminDeliveryAnalysisProps
 
       <HubOperationTable
         hubs={data.hubs}
-        onSelectHub={(hubId) => setSelectedHubId(hubId)}
+        onSelectHub={handleSelectHub}
       />
 
-      {selectedDetail && (
+      {isLoadingDetail && selectedHubId && (
+        <div className="loading-state">직원 정보를 조회하는 중입니다.</div>
+      )}
+
+      {selectedDetail && !isLoadingDetail && (
         <HubDetailPanel
           detail={selectedDetail}
-          onClose={() => setSelectedHubId(null)}
+          onClose={() => { setSelectedHubId(null); setHubDetailOverride(null) }}
         />
       )}
     </div>

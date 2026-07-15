@@ -8,7 +8,7 @@ import type {
 } from '../types/api'
 import type { EtaPrediction, Vehicle, VehicleWithEta } from '../types/vehicle'
 
-const EMPLOYEE_HUB_ID = 'HUB074'
+const EMPLOYEE_HUB_ID = 'HUB056'
 
 /**
  * ETA 예측 API 엔드포인트 (AI Agent).

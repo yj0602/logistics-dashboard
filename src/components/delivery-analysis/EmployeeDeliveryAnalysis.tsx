@@ -7,6 +7,7 @@ import { DeliveryOptionCard } from './DeliveryOptionCard'
 import { DestinationList } from './DestinationList'
 import { DeliveryRoutePreview } from './DeliveryRoutePreview'
 import { AiQuestionPanel } from './AiQuestionPanel'
+import { useAuth } from '../../contexts/AuthContext'
 import { getEmployeeAnalysis } from '../../services/deliveryAnalysisService'
 import type { DeliveryDecision, EmployeeAnalysisData, RiskLevel } from '../../types/deliveryAnalysis'
 
@@ -33,6 +34,7 @@ const vehicleStatusLabels: Record<string, string> = {
 }
 
 export function EmployeeDeliveryAnalysis({ refreshKey }: EmployeeDeliveryAnalysisProps) {
+  const { user } = useAuth()
   const [data, setData] = useState<EmployeeAnalysisData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -41,14 +43,14 @@ export function EmployeeDeliveryAnalysis({ refreshKey }: EmployeeDeliveryAnalysi
 
   const loadData = useCallback(() => {
     setError(null)
-    getEmployeeAnalysis()
+    getEmployeeAnalysis(user)
       .then((result) => {
         setData(result)
         setSelectedOptionId(result.decision.recommendedOptionId)
       })
       .catch(() => setError('분석 데이터를 불러오지 못했습니다.'))
       .finally(() => setIsLoading(false))
-  }, [])
+  }, [user])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(loadData, 0)

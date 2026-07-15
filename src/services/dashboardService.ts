@@ -98,7 +98,7 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
 }
 
 export async function getEmployeeDashboardData(
-  employeeHubId = 'HUB074',
+  employeeHubId = 'HUB056',
 ): Promise<EmployeeDashboardData> {
   const [vehicles, hubs] = await Promise.all([
     getVehicles('EMPLOYEE', employeeHubId),

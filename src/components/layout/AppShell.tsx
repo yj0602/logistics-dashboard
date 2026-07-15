@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import type { UserRole } from '../../types/auth'
+import type { CurrentUser } from '../../types/auth'
+import { useAuth } from '../../contexts/AuthContext'
 import { Sidebar } from './Sidebar'
 import { TopHeader } from './TopHeader'
 
 export interface AppShellContext {
   role: UserRole
   refreshKey: number
+  user: CurrentUser | null
 }
 
 /** 자동 갱신 주기 (ms) */
@@ -15,9 +18,12 @@ const AUTO_REFRESH_INTERVAL = 60_000
 export function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [role, setRole] = useState<UserRole>(
-    location.pathname.startsWith('/employee') ? 'EMPLOYEE' : 'ADMIN',
-  )
+  const { user } = useAuth()
+  const [role, setRole] = useState<UserRole>(() => {
+    // AuthContext에 사용자 정보가 있으면 그 role을 사용
+    if (user) return user.role
+    return location.pathname.startsWith('/employee') ? 'EMPLOYEE' : 'ADMIN'
+  })
   const [refreshKey, setRefreshKey] = useState(0)
 
   // 1분마다 자동 갱신
@@ -34,7 +40,7 @@ export function AppShell() {
     : location.pathname.startsWith('/admin')
       ? 'ADMIN'
       : null
-  const activeRole = routeRole ?? role
+  const activeRole = routeRole ?? (user?.role ?? role)
 
   const handleRoleChange = (nextRole: UserRole) => {
     setRole(nextRole)
@@ -45,8 +51,6 @@ export function AppShell() {
     if (path.startsWith('/admin/dashboard') || path.startsWith('/employee/dashboard')) {
       navigate(nextRole === 'ADMIN' ? '/admin/dashboard' : '/employee/dashboard')
     }
-    // Shared pages (e.g. /vehicles, /delivery-analysis): stay on the same page
-    // The role change via state/context is enough
   }
 
   const handleRefresh = () => {
@@ -59,7 +63,7 @@ export function AppShell() {
       <div className="app-main">
         <TopHeader onRoleChange={handleRoleChange} onRefresh={handleRefresh} role={activeRole} />
         <main className="content">
-          <Outlet context={{ role: activeRole, refreshKey } satisfies AppShellContext} />
+          <Outlet context={{ role: activeRole, refreshKey, user } satisfies AppShellContext} />
         </main>
       </div>
     </div>

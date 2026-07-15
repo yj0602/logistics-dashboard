@@ -5,6 +5,7 @@ import { PageHeader } from '../components/layout/PageHeader'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { VehicleMap } from '../components/vehicles/VehicleMap'
+import { useAuth } from '../contexts/AuthContext'
 import { getHubs } from '../services/hubService'
 import { getVehicles } from '../services/vehicleService'
 import type { Hub } from '../types/hub'
@@ -20,6 +21,7 @@ function getCurrentTime(): string {
 
 export function VehicleMonitoringPage() {
   const { role, refreshKey } = useOutletContext<AppShellContext>()
+  const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const initialVehicleId = searchParams.get('vehicleId') ?? undefined
   const initialHubId = searchParams.get('hubId') ?? undefined
@@ -32,7 +34,7 @@ export function VehicleMonitoringPage() {
 
   const loadMapData = useCallback(() => {
     setErrorMessage(null)
-    Promise.all([getVehicles(role), getHubs()])
+    Promise.all([getVehicles(role, user?.hubId), getHubs()])
       .then(([vehicleData, hubData]) => {
         setVehicles(vehicleData)
         setHubs(hubData)
@@ -42,7 +44,7 @@ export function VehicleMonitoringPage() {
         setErrorMessage('차량 위치 정보를 불러오지 못했습니다.')
       })
       .finally(() => setIsInitialLoading(false))
-  }, [role])
+  }, [role, user?.hubId])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(loadMapData, 0)
@@ -76,7 +78,7 @@ export function VehicleMonitoringPage() {
         title="실시간 차량 위치"
         updatedAt={updatedAt}
       />
-      <VehicleMap hubs={hubs} role={role} vehicles={vehicles} initialVehicleId={initialVehicleId} initialHubId={initialHubId} initialRegion={initialRegion} />
+      <VehicleMap hubs={hubs} role={role} vehicles={vehicles} initialVehicleId={initialVehicleId} initialHubId={initialHubId} initialRegion={initialRegion} employeeHubId={user?.hubId} />
     </div>
   )
 }

@@ -8,25 +8,27 @@ import { Card } from '../components/ui/Card'
 import { MetricTooltip } from '../components/ui/MetricTooltip'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { VehicleMap } from '../components/vehicles/VehicleMap'
+import { useAuth } from '../contexts/AuthContext'
 import { getEmployeeDashboardData } from '../services/dashboardService'
 import type { EmployeeDashboardData } from '../types/dashboard'
 
 export function EmployeeDashboardPage() {
   const navigate = useNavigate()
   const { refreshKey } = useOutletContext<AppShellContext>()
+  const { user } = useAuth()
   const [data, setData] = useState<EmployeeDashboardData | null>(null)
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const loadDashboardData = useCallback(() => {
     setErrorMessage(null)
-    getEmployeeDashboardData()
+    getEmployeeDashboardData(user?.hubId)
       .then(setData)
       .catch(() => {
         setErrorMessage('차량 정보를 불러오지 못했습니다.')
       })
       .finally(() => setIsInitialLoading(false))
-  }, [])
+  }, [user?.hubId])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(loadDashboardData, 0)
@@ -162,7 +164,7 @@ export function EmployeeDashboardPage() {
           title="내 Hub 차량 위치"
           action={<Button onClick={() => navigate('/vehicles')}>전체 지도 보기</Button>}
         >
-          <VehicleMap compact role="EMPLOYEE" hubs={data.mapHubs} vehicles={data.vehicles} />
+          <VehicleMap compact role="EMPLOYEE" hubs={data.mapHubs} vehicles={data.vehicles} employeeHubId={user?.hubId} />
         </Card>
 
         <Card title="내 Hub 차량 현황">

@@ -1,6 +1,7 @@
 import maplibregl from 'maplibre-gl'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AmazonMap } from '../components/map/AmazonMap'
+import { useAuth } from '../contexts/AuthContext'
 import { getVehicleRouteInput } from '../services/routeInputService'
 import { mapRouteInputResponse } from '../services/routeInputMapper'
 import { optimizeAndCalculateRoute } from '../services/routeOptimizationService'
@@ -14,12 +15,10 @@ import type {
 import type { Hub } from '../types/hub'
 import { truncateAddressToDistrict } from '../utils/addressUtils'
 
-/** 직원 기본 허브 */
-const DEFAULT_HUB_ID = 'HUB074'
-
 type PageStatus = 'idle' | 'loading-input' | 'loading-optimize' | 'success' | 'error'
 
 export function RouteOptimizationTestPage() {
+  const { user } = useAuth()
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef<maplibregl.Marker[]>([])
   const abortRef = useRef<AbortController | null>(null)
@@ -31,9 +30,11 @@ export function RouteOptimizationTestPage() {
 
   // 허브 목록 (출발 허브 선택용)
   const [hubs, setHubs] = useState<Hub[]>([])
-  const [selectedHubId, setSelectedHubId] = useState<string>(DEFAULT_HUB_ID)
+  const [selectedHubId, setSelectedHubId] = useState<string>(user?.hubId ?? '')
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('')
-  const [vehicleIdInput, setVehicleIdInput] = useState<string>('VEH001')
+  const [vehicleIdInput, setVehicleIdInput] = useState<string>(
+    user?.assignedVehicleId ?? '',
+  )
 
   // 초기 데이터 로드: 허브 목록
   useEffect(() => {
@@ -41,11 +42,18 @@ export function RouteOptimizationTestPage() {
       try {
         const hubList = await getHubs()
         setHubs(hubList)
+        // 로그인 사용자의 hubId가 목록에 있으면 자동 선택
+        if (user?.hubId && hubList.some((h) => h.hubId === user.hubId)) {
+          setSelectedHubId(user.hubId)
+        } else if (hubList.length > 0 && !selectedHubId) {
+          setSelectedHubId(hubList[0].hubId)
+        }
       } catch (err) {
         console.error('[RouteOptimizationTest] 허브 데이터 로드 실패:', err)
       }
     }
     loadBaseData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 언마운트 시 진행 중인 요청 취소
@@ -291,7 +299,7 @@ export function RouteOptimizationTestPage() {
               type="text"
               value={vehicleIdInput}
               onChange={(e) => setVehicleIdInput(e.target.value)}
-              placeholder="예: VEH001"
+              placeholder="예: VEH038"
               style={{
                 padding: '6px 12px',
                 border: '1px solid var(--border-default)',
@@ -331,6 +339,13 @@ export function RouteOptimizationTestPage() {
             {isLoading ? (statusMessage ?? '처리 중...') : '경로 최적화 실행'}
           </button>
         </div>
+        {user && (
+          <p style={{ margin: '8px 0 0', fontSize: '12px', color: 'var(--text-tertiary)' }}>
+            로그인: {user.name} ({user.employeeId})
+            {user.hubId && ` | 소속 허브: ${user.hubId}`}
+            {user.assignedVehicleId && ` | 배정 차량: ${user.assignedVehicleId}`}
+          </p>
+        )}
       </div>
 
       {/* 지도 영역 */}

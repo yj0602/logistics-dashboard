@@ -1,7 +1,46 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
+import { useAuth } from '../contexts/AuthContext'
+import { getEmployee } from '../services/employeeService'
 
 export function LoginPage() {
+  const navigate = useNavigate()
+  const { login } = useAuth()
+  const [employeeId, setEmployeeId] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault()
+
+    const id = employeeId.trim()
+    if (!id) {
+      setError('직원 ID를 입력해 주세요.')
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const user = await getEmployee(id)
+      login(user)
+
+      if (user.role === 'ADMIN') {
+        navigate('/admin/dashboard', { replace: true })
+      } else {
+        navigate('/employee/dashboard', { replace: true })
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : '로그인에 실패했습니다.'
+      setError(message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <main className="login-page">
       <section className="login-intro">
@@ -25,20 +64,30 @@ export function LoginPage() {
       </section>
       <section className="login-panel">
         <h2>로그인</h2>
-        <label>
-          이메일 또는 아이디
-          <input placeholder="이메일 또는 아이디를 입력하세요" type="text" />
-        </label>
-        <label>
-          비밀번호
-          <input placeholder="비밀번호를 입력하세요" type="password" />
-        </label>
-        <Link to="/admin/dashboard">
-          <Button variant="primary">관리자 모드로 진입</Button>
-        </Link>
-        <Link to="/employee/dashboard">
-          <Button>직원 모드로 진입</Button>
-        </Link>
+        <form onSubmit={handleLogin}>
+          <label>
+            직원 ID
+            <input
+              placeholder="예: ADM001 또는 DRV001"
+              type="text"
+              value={employeeId}
+              onChange={(e) => setEmployeeId(e.target.value)}
+              disabled={isLoading}
+              autoFocus
+            />
+          </label>
+          <p className="login-hint">
+            관리자: ADM + 번호 | 배송기사: DRV + 번호
+          </p>
+          {error && (
+            <p className="login-error" role="alert">
+              {error}
+            </p>
+          )}
+          <Button variant="primary" disabled={isLoading}>
+            {isLoading ? '확인 중...' : '로그인'}
+          </Button>
+        </form>
       </section>
     </main>
   )

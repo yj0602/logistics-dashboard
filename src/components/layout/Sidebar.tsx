@@ -1,8 +1,10 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import type { UserRole } from '../../types/auth'
+import { useAuth } from '../../contexts/AuthContext'
 
 export function Sidebar({ role }: { role: UserRole }) {
   const navigate = useNavigate()
+  const { logout } = useAuth()
   const dashboardPath =
     role === 'ADMIN' ? '/admin/dashboard' : '/employee/dashboard'
   const navItems = [
@@ -13,6 +15,11 @@ export function Sidebar({ role }: { role: UserRole }) {
       ? [{ label: '배송 최적 경로', path: '/route-optimization' }]
       : []),
   ]
+
+  function handleLogout() {
+    logout()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <aside className="sidebar">
@@ -39,9 +46,9 @@ export function Sidebar({ role }: { role: UserRole }) {
           </NavLink>
         ))}
       </nav>
-      <NavLink className="sidebar-logout" to="/login">
+      <button className="sidebar-logout" onClick={handleLogout} type="button">
         로그아웃
-      </NavLink>
+      </button>
     </aside>
   )
 }

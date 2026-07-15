@@ -192,7 +192,7 @@ export function VehicleMap({
   hubs,
   compact = false,
   role = 'ADMIN',
-  employeeHubId = 'HUB074',
+  employeeHubId = '',
   initialVehicleId,
   initialHubId,
   initialRegion,
