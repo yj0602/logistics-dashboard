@@ -7,7 +7,7 @@ import type {
   VehicleApiResponse,
 } from '../types/api'
 import type { EtaPrediction, Vehicle, VehicleWithEta } from '../types/vehicle'
-import { DEMO_CURRENT_TIME } from '../utils/demoTime'
+import { DEMO_SCHEDULED_ARRIVAL_TIME } from '../utils/demoTime'
 
 const EMPLOYEE_HUB_ID = 'HUB056'
 
@@ -72,12 +72,12 @@ function formatTimeToHHmm(isoTime: string): string {
 }
 
 /**
- * ETA 시각과 데모 기준 스케줄 시각의 차이를 분 단위로 계산한다.
+ * ETA 시각과 지연 판단 기준 시각(10:30)의 차이를 분 단위로 계산한다.
  * ETA가 기준 시각보다 늦으면 양수(지연), 이전이면 0.
  * HH:mm 형식 또는 ISO 8601 형식 모두 지원.
  */
 function calculateDelayFromSchedule(etaTimeStr: string): number {
-  const [baseHour, baseMin] = DEMO_CURRENT_TIME.split(':').map(Number)
+  const [baseHour, baseMin] = DEMO_SCHEDULED_ARRIVAL_TIME.split(':').map(Number)
   const baseTotalMin = baseHour * 60 + baseMin
 
   // HH:mm 형식
