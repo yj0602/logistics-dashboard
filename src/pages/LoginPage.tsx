@@ -1,15 +1,23 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { useAuth } from '../contexts/AuthContext'
 import { getEmployee } from '../services/employeeService'
 
 export function LoginPage() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const location = useLocation()
+  const { login, user } = useAuth()
   const [employeeId, setEmployeeId] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // 이미 로그인 상태면 대시보드로 리다이렉트
+  if (user) {
+    const defaultPath = user.role === 'ADMIN' ? '/admin/dashboard' : '/employee/dashboard'
+    navigate(defaultPath, { replace: true })
+    return null
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -24,14 +32,13 @@ export function LoginPage() {
     setError(null)
 
     try {
-      const user = await getEmployee(id)
-      login(user)
+      const userData = await getEmployee(id)
+      login(userData)
 
-      if (user.role === 'ADMIN') {
-        navigate('/admin/dashboard', { replace: true })
-      } else {
-        navigate('/employee/dashboard', { replace: true })
-      }
+      // AuthGuard에서 저장한 원래 경로가 있으면 그쪽으로, 없으면 role 기반 대시보드로
+      const from = (location.state as { from?: string })?.from
+      const defaultPath = userData.role === 'ADMIN' ? '/admin/dashboard' : '/employee/dashboard'
+      navigate(from ?? defaultPath, { replace: true })
     } catch (err) {
       const message =
         err instanceof Error ? err.message : '로그인에 실패했습니다.'
