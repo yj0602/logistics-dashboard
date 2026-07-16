@@ -140,8 +140,7 @@ const HUB_ICON_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none
 /** 트럭 아이콘 SVG (vehicle marker용 — 정차 차량) */
 const VEHICLE_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`
 
-/** 방향 화살표 SVG (이동 중 차량용) — 위(북)를 가리키며 bearing으로 회전 */
-const VEHICLE_DIRECTION_SVG = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2 L18 14 L12 11 L6 14 Z"/></svg>`
+
 
 function createHubMarkerElement(
   name: string,
@@ -187,19 +186,10 @@ function createVehicleMarkerElement(
 
   const approaching = !compact && isApproaching(vehicle)
 
-  if (isMoving && animState?.bearing != null) {
-    // Directional arrow marker for moving vehicles
-    el.innerHTML = `
-      <div class="marker-pin marker-directional" style="transform: rotate(${animState.bearing}deg)">${VEHICLE_DIRECTION_SVG}</div>
-      <span class="marker-label">${vehicle.vehicleId}${approaching ? ' <small class="marker-sub-label">임박</small>' : ''}</span>
-    `
-  } else {
-    // Static truck icon for stationary vehicles
-    el.innerHTML = `
-      <div class="marker-pin">${VEHICLE_ICON_SVG}</div>
-      <span class="marker-label">${vehicle.vehicleId}${approaching ? ' <small class="marker-sub-label">임박</small>' : ''}</span>
-    `
-  }
+  el.innerHTML = `
+    <div class="marker-pin">${VEHICLE_ICON_SVG}</div>
+    <span class="marker-label">${vehicle.vehicleId}${approaching ? ' <small class="marker-sub-label">임박</small>' : ''}</span>
+  `
   return el
 }
 
