@@ -8,7 +8,7 @@
  */
 
 /** 데모 기준 시각 (HH:mm) */
-export const DEMO_CURRENT_TIME = '08:30'
+export const DEMO_CURRENT_TIME = '10:30'
 
 /** 간선차량 도착 마감 시각 */
 export const DEMO_DEADLINE_TIME = '11:00'

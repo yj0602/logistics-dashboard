@@ -7,6 +7,7 @@ import type {
   VehicleApiResponse,
 } from '../types/api'
 import type { EtaPrediction, Vehicle, VehicleWithEta } from '../types/vehicle'
+import { DEMO_CURRENT_TIME } from '../utils/demoTime'
 
 const EMPLOYEE_HUB_ID = 'HUB056'
 
@@ -71,15 +72,54 @@ function formatTimeToHHmm(isoTime: string): string {
 }
 
 /**
+ * ETA 시각과 데모 기준 스케줄 시각의 차이를 분 단위로 계산한다.
+ * ETA가 기준 시각보다 늦으면 양수(지연), 이전이면 0.
+ * HH:mm 형식 또는 ISO 8601 형식 모두 지원.
+ */
+function calculateDelayFromSchedule(etaTimeStr: string): number {
+  const [baseHour, baseMin] = DEMO_CURRENT_TIME.split(':').map(Number)
+  const baseTotalMin = baseHour * 60 + baseMin
+
+  // HH:mm 형식
+  const shortMatch = etaTimeStr.match(/^(\d{2}):(\d{2})$/)
+  if (shortMatch) {
+    const etaTotalMin = parseInt(shortMatch[1], 10) * 60 + parseInt(shortMatch[2], 10)
+    const diff = etaTotalMin - baseTotalMin
+    return diff > 0 ? diff : 0
+  }
+
+  // ISO 8601 형식
+  try {
+    const date = new Date(etaTimeStr)
+    if (isNaN(date.getTime())) return 0
+    const etaTotalMin = date.getHours() * 60 + date.getMinutes()
+    const diff = etaTotalMin - baseTotalMin
+    return diff > 0 ? diff : 0
+  } catch {
+    return 0
+  }
+}
+
+/**
  * ETA API 응답을 프론트 EtaPrediction 타입으로 변환한다.
+ * API가 delayMinutes를 0으로 반환하는 경우,
+ * estimatedArrivalTime과 데모 기준 시각(10:30)의 차이로 지연 분수를 계산한다.
  */
 function mapEtaResponse(apiEta: EtaPredictionApiResponse): EtaPrediction {
+  const formattedEta = apiEta.estimatedArrivalTime
+    ? formatTimeToHHmm(apiEta.estimatedArrivalTime)
+    : null
+
+  // API delayMinutes가 유효한 값이면 그대로 사용, 0이면 직접 계산
+  let delayMinutes = apiEta.delayMinutes
+  if (delayMinutes === 0 && apiEta.estimatedArrivalTime && apiEta.status === 'DELAYED') {
+    delayMinutes = calculateDelayFromSchedule(apiEta.estimatedArrivalTime)
+  }
+
   return {
     vehicleId: apiEta.vehicleId,
-    estimatedArrivalTime: apiEta.estimatedArrivalTime
-      ? formatTimeToHHmm(apiEta.estimatedArrivalTime)
-      : null,
-    delayMinutes: apiEta.delayMinutes,
+    estimatedArrivalTime: formattedEta,
+    delayMinutes,
     predictionUpdatedAt: formatTimeToHHmm(apiEta.predictionUpdatedAt),
     status: apiEta.status,
     confidence: apiEta.confidence,

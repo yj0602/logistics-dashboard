@@ -1,0 +1,19 @@
+customHeaders:
+  - pattern: '**/*'
+    headers:
+      - key: 'Cache-Control'
+        value: 'no-cache'
+
+customRules:
+  - source: '/api/<*>'
+    target: 'https://bkg2eoa1fl.execute-api.ap-northeast-2.amazonaws.com/<*>'
+    status: '200'
+    condition: null
+  - source: '/eta-api/<*>'
+    target: 'https://7c9ge0cd58.execute-api.ap-northeast-2.amazonaws.com/<*>'
+    status: '200'
+    condition: null
+  - source: '</^[^.]+$|\.(?!(css|gif|ico|jpg|js|png|txt|svg|woff|woff2|ttf|map|json|webp)$)([^.]+$)/>'
+    target: '/index.html'
+    status: '200'
+    condition: null
