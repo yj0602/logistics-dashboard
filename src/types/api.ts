@@ -77,6 +77,8 @@ export interface EtaPredictionApiResponse {
   delayMinutes: number
   /** 예측 모델이 마지막으로 결과를 갱신한 시간 (ISO 8601) */
   predictionUpdatedAt: string
+  /** AI 예측 기반 차량 상태 (차량 위치 API와 별도로 지연 여부를 판단) */
+  status?: 'ARRIVED' | 'IN_TRANSIT' | 'DELAYED'
   /** 예측 신뢰도 (0.0~1.0) */
   confidence?: number
 }

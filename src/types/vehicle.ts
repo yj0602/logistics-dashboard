@@ -24,6 +24,8 @@ export interface EtaPrediction {
   estimatedArrivalTime: string | null
   delayMinutes: number
   predictionUpdatedAt: string
+  /** AI 예측 기반 차량 상태 (ETA API에서 제공) */
+  status?: VehicleStatus
   confidence?: number
 }
 

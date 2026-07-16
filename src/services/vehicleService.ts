@@ -81,6 +81,7 @@ function mapEtaResponse(apiEta: EtaPredictionApiResponse): EtaPrediction {
       : null,
     delayMinutes: apiEta.delayMinutes,
     predictionUpdatedAt: formatTimeToHHmm(apiEta.predictionUpdatedAt),
+    status: apiEta.status,
     confidence: apiEta.confidence,
   }
 }
@@ -121,6 +122,7 @@ async function fetchEtaPredictions(): Promise<EtaPrediction[]> {
 /**
  * 차량 목록에 ETA 정보를 결합한다.
  * ETA predictions 배열에서 vehicleId로 매칭.
+ * ETA API가 제공하는 status(DELAYED 등)를 차량 상태에 반영한다.
  */
 function attachEtaFromPredictions(
   vehicles: Vehicle[],
@@ -131,7 +133,10 @@ function attachEtaFromPredictions(
       predictions.find((p) => p.vehicleId === vehicle.vehicleId) ??
       createEmptyEtaPrediction(vehicle.vehicleId)
 
-    return { ...vehicle, eta }
+    // ETA API의 status가 DELAYED인 경우 차량 상태를 DELAYED로 갱신
+    const resolvedStatus = eta.status === 'DELAYED' ? 'DELAYED' : vehicle.status
+
+    return { ...vehicle, status: resolvedStatus, eta }
   })
 }
 
