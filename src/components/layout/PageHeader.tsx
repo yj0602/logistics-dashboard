@@ -11,7 +11,7 @@ export function PageHeader({ title, description, }: PageHeaderProps) {
         <h1>{title}</h1>
         <p>{description}</p>
       </div>
-        <span className="page-updated">지연 기준 11:00</span>
+        <span className="page-updated">지연 기준 10:30</span>
     </div>
   )
 }
