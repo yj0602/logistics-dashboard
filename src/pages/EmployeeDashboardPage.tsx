@@ -96,13 +96,13 @@ export function EmployeeDashboardPage() {
     if (!data) return null
     const etaStr = data.summary.lastVehicleEta
     if (!etaStr || etaStr === '-') return null
-    const now = new Date()
     const [hours, minutes] = etaStr.split(':').map(Number)
     if (isNaN(hours) || isNaN(minutes)) return null
-    const etaDate = new Date(now)
-    etaDate.setHours(hours, minutes, 0, 0)
-    const diff = Math.round((etaDate.getTime() - now.getTime()) / 60000)
-    return diff
+    // 데모 기준 시각(08:30)과 비교
+    const etaTotalMin = hours * 60 + minutes
+    const currentTotalMin = 8 * 60 + 30 // DEMO_CURRENT_TIME 08:30
+    const diff = etaTotalMin - currentTotalMin
+    return diff > 0 ? diff : 0
   }, [data])
 
   if (isInitialLoading) {

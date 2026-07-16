@@ -11,9 +11,7 @@ export function PageHeader({ title, description, }: PageHeaderProps) {
         <h1>{title}</h1>
         <p>{description}</p>
       </div>
-      {/* {updatedAt && (
-        <span className="page-updated">마지막 업데이트: {updatedAt}</span>
-      )} */}
+        <span className="page-updated">지연 기준 11:00</span>
     </div>
   )
 }

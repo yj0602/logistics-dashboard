@@ -10,13 +10,10 @@ import { getHubs } from '../services/hubService'
 import { getVehicles } from '../services/vehicleService'
 import type { Hub } from '../types/hub'
 import type { VehicleWithEta } from '../types/vehicle'
+import { getDemoCurrentTime } from '../utils/demoTime'
 
 function getCurrentTime(): string {
-  return new Date().toLocaleTimeString('ko-KR', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
+  return getDemoCurrentTime()
 }
 
 export function VehicleMonitoringPage() {

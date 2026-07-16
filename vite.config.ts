@@ -12,6 +12,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
+      '/eta-api': {
+        target: 'https://7c9ge0cd58.execute-api.ap-northeast-2.amazonaws.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/eta-api/, ''),
+      },
     },
   },
 })

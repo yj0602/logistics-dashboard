@@ -1,6 +1,7 @@
 import type { UserRole } from '../../types/auth'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../ui/Button'
+import { DEMO_CURRENT_TIME } from '../../utils/demoTime'
 
 interface TopHeaderProps {
   role: UserRole
@@ -32,8 +33,7 @@ export function TopHeader({ role, onRefresh }: TopHeaderProps) {
           직원
         </span>
       </div>
-      {/* <time className="header-time">{currentTime}</time> */}
-      {<div>지연 기준 시간 11:00</div>}
+      <time className="header-time">{DEMO_CURRENT_TIME}</time>
       {/* <div className="notification">
         알림
         <span>3</span>

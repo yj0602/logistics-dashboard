@@ -17,17 +17,14 @@ import type {
   RiskLevel,
 } from '../types/deliveryAnalysis'
 import type { RouteInputApiDestination } from '../types/routeOptimization'
+import { calculateDemoMinutesUntil, getDemoCurrentTime, getDemoIsoTime } from '../utils/demoTime'
 import { requestOptimization } from './chatService'
 import { getHubs } from './hubService'
 import { getVehicleRouteInput } from './routeInputService'
 import { getVehicles } from './vehicleService'
 
 function getCurrentTime(): string {
-  return new Date().toLocaleTimeString('ko-KR', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
+  return getDemoCurrentTime()
 }
 
 /**
@@ -236,34 +233,17 @@ export async function getEmployeeAnalysis(
 }
 
 /**
- * HH:mm 형식의 시간까지 남은 분 수를 계산한다.
- * 데모 환경: 기준 시각을 06:00으로 설정 (ETA가 07~09시 대이므로).
- * 실제 운영 시에는 현재 시각(new Date())을 사용하도록 전환.
+ * HH:mm 형식의 시간까지 데모 현재 시각 기준으로 남은 분 수를 계산한다.
  */
-const DEMO_BASELINE_HOUR = 6
-const DEMO_BASELINE_MIN = 0
-
 function calculateMinutesUntil(timeStr: string): number {
-  const match = timeStr.match(/^(\d{2}):(\d{2})$/)
-  if (!match) return 0
-
-  const targetHour = parseInt(match[1], 10)
-  const targetMin = parseInt(match[2], 10)
-
-  const targetTotalMin = targetHour * 60 + targetMin
-  const baselineTotalMin = DEMO_BASELINE_HOUR * 60 + DEMO_BASELINE_MIN
-
-  const diff = targetTotalMin - baselineTotalMin
-  if (diff <= 0) return 0
-
-  return diff
+  return calculateDemoMinutesUntil(timeStr)
 }
 
 /**
- * 현재 시각을 ISO 형식으로 반환한다.
+ * 데모 현재 시각을 ISO 형식으로 반환한다.
  */
 function getCurrentIsoTime(): string {
-  return new Date().toISOString().slice(0, 19)
+  return getDemoIsoTime()
 }
 
 // ===== 거리/이동시간 계산 =====

@@ -5,6 +5,7 @@ import type {
 } from '../types/dashboard'
 import type { Hub } from '../types/hub'
 import type { VehicleWithEta } from '../types/vehicle'
+import { getDemoCurrentTime } from '../utils/demoTime'
 import { getHubs } from './hubService'
 import { getVehicles } from './vehicleService'
 
@@ -38,11 +39,7 @@ function buildHubSummary(hubs: Hub[], vehicles: VehicleWithEta[]): HubOperationS
 }
 
 function getCurrentTime(): string {
-  return new Date().toLocaleTimeString('ko-KR', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
+  return getDemoCurrentTime()
 }
 
 /** 대응 필요 허브 판단: 해당 허브에 도착 예정 차량 중 하나라도 조건에 해당하면 대응 필요 */
