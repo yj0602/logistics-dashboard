@@ -10,6 +10,10 @@ function getBaseUrl(): string {
   if (!baseUrl) {
     throw new Error('VITE_API_BASE_URL 환경 변수가 설정되지 않았습니다.')
   }
+  // 상대경로이고 배포 환경(localhost가 아닌)이면 직접 API Gateway URL 사용
+  if (baseUrl.startsWith('/') && typeof window !== 'undefined' && !window.location.hostname.includes('localhost')) {
+    return 'https://bkg2eoa1fl.execute-api.ap-northeast-2.amazonaws.com'
+  }
   // 끝 슬래시 제거
   return baseUrl.replace(/\/+$/, '')
 }

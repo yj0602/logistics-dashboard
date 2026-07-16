@@ -14,10 +14,19 @@ const EMPLOYEE_HUB_ID = 'HUB056'
 /**
  * ETA 예측 API 엔드포인트 (AI Agent).
  * 차량 위치 API와 별도 호스트이므로 전용 환경변수를 사용한다.
+ * 상대경로(/eta-api)는 로컬 Vite 프록시용이므로, 배포 환경에서는 직접 URL을 사용한다.
  */
-const ETA_API_URL =
-  import.meta.env.VITE_ETA_API_URL ??
-  'https://7c9ge0cd58.execute-api.ap-northeast-2.amazonaws.com/prod'
+function getEtaApiUrl(): string {
+  const envUrl = import.meta.env.VITE_ETA_API_URL
+  if (!envUrl) {
+    return 'https://7c9ge0cd58.execute-api.ap-northeast-2.amazonaws.com/prod'
+  }
+  // 상대경로이고 현재 호스트가 localhost가 아니면(배포 환경) 직접 URL 사용
+  if (envUrl.startsWith('/') && typeof window !== 'undefined' && !window.location.hostname.includes('localhost')) {
+    return 'https://7c9ge0cd58.execute-api.ap-northeast-2.amazonaws.com/prod'
+  }
+  return envUrl
+}
 
 /**
  * API 응답을 프론트 Vehicle 타입으로 변환.
@@ -141,7 +150,7 @@ function createEmptyEtaPrediction(vehicleId: string): EtaPrediction {
  */
 async function fetchEtaPredictions(): Promise<EtaPrediction[]> {
   try {
-    const url = `${ETA_API_URL}/vehicles/eta`
+    const url = `${getEtaApiUrl()}/vehicles/eta`
     const response = await fetch(url, {
       method: 'GET',
       headers: { Accept: 'application/json' },
