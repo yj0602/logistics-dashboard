@@ -1871,6 +1871,22 @@ dd {
   background: var(--color-danger-50);
 }
 
+/* ===== No-Employee Hub Indicator ===== */
+
+.row-no-employees {
+  opacity: 0.7;
+}
+
+.no-employee-indicator {
+  color: var(--color-warning-500, #f59e0b);
+  font-weight: 700;
+}
+
+.text-muted {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
 /* ===== Clickable Row ===== */
 .clickable-row {
   cursor: pointer;

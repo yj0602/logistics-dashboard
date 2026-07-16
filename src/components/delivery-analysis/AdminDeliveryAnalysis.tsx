@@ -8,6 +8,7 @@ import { HubDetailPanel } from './HubDetailPanel'
 import { HubOperationTable } from './HubOperationTable'
 import { getAdminAnalysis } from '../../services/deliveryAnalysisService'
 import { getEmployeesByHubId, getEmployeesWithOrdersByHubId, preloadEmployeeCache } from '../../services/employeeService'
+import { hasAssignedEmployees } from '../../mocks/hubEmployeeMapping'
 import type { IncomingOrdersApiResponse } from '../../types/api'
 import type { AdminAnalysisData, HubDetail, HubEmployee } from '../../types/deliveryAnalysis'
 import type { CurrentUser } from '../../types/auth'
@@ -51,12 +52,27 @@ export function AdminDeliveryAnalysis({ refreshKey }: AdminDeliveryAnalysisProps
     setHubDetailOverride(null)
 
     try {
-      // 먼저 직원 목록만 조회 (이건 캐시에서 바로 반환)
-      const employees = await getEmployeesByHubId(hubId)
-      console.log(`[AdminAnalysis] Hub ${hubId}: ${employees.length}명 조회됨`)
-
       const hubRow = data?.hubs.find((h) => h.hubId === hubId)
       const remainingMinutes = hubRow?.remainingMinutes ?? 0
+
+      // 직원이 할당되지 않은 허브는 API 호출 없이 바로 표시
+      if (!hasAssignedEmployees(hubId)) {
+        const detail: HubDetail = {
+          hubId,
+          hubName: hubRow?.hubName ?? hubId,
+          lastVehicleEta: hubRow?.lastVehicleEta ?? '-',
+          waitingEmployees: 0,
+          employees: [],
+          expectedDeliveries: 0,
+          riskFactors: ['배정된 직원이 없는 허브입니다.'],
+        }
+        setHubDetailOverride(detail)
+        return
+      }
+
+      // 직원이 할당된 허브: 실제 조회
+      const employees = await getEmployeesByHubId(hubId)
+      console.log(`[AdminAnalysis] Hub ${hubId}: ${employees.length}명 조회됨`)
 
       if (employees.length === 0) {
         // 직원이 없는 허브

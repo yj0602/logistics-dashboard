@@ -1,4 +1,5 @@
 import type { HubOperationRow, RiskLevel } from '../../types/deliveryAnalysis'
+import { hasAssignedEmployees } from '../../mocks/hubEmployeeMapping'
 
 interface HubOperationTableProps {
   hubs: HubOperationRow[]
@@ -44,36 +45,46 @@ export function HubOperationTable({ hubs, onSelectHub }: HubOperationTableProps)
             </tr>
           </thead>
           <tbody>
-            {hubs.map((hub) => (
-              <tr
-                key={hub.hubId}
-                className="clickable-row"
-                onClick={() => onSelectHub(hub.hubId)}
-              >
-                <td>{hub.hubName}</td>
-                <td>{hub.lastVehicleEta}</td>
-                <td>{hub.remainingMinutes}분</td>
-                <td>{hub.waitingEmployees}대</td>
-                <td>{hub.availableEmployees}대</td>
-                <td>{hub.averageBufferMinutes}분</td>
-                <td>
-                  <span className={`risk-badge risk-${hub.riskLevel.toLowerCase()}`}>
-                    {riskLabels[hub.riskLevel]}
-                  </span>
-                </td>
-                <td>
-                  <button
-                    className="btn btn-sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onSelectHub(hub.hubId)
-                    }}
-                  >
-                    직원 조회
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {hubs.map((hub) => {
+              const hasEmployees = hasAssignedEmployees(hub.hubId)
+              return (
+                <tr
+                  key={hub.hubId}
+                  className={`clickable-row${!hasEmployees ? ' row-no-employees' : ''}`}
+                  onClick={() => onSelectHub(hub.hubId)}
+                >
+                  <td>
+                    {hub.hubName}
+                    {!hasEmployees && <span className="no-employee-indicator" title="배정 직원 없음"> ·</span>}
+                  </td>
+                  <td>{hub.lastVehicleEta}</td>
+                  <td>{hub.remainingMinutes}분</td>
+                  <td>{hub.waitingEmployees}대</td>
+                  <td>{hub.availableEmployees}대</td>
+                  <td>{hub.averageBufferMinutes}분</td>
+                  <td>
+                    <span className={`risk-badge risk-${hub.riskLevel.toLowerCase()}`}>
+                      {riskLabels[hub.riskLevel]}
+                    </span>
+                  </td>
+                  <td>
+                    {hasEmployees ? (
+                      <button
+                        className="btn btn-sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onSelectHub(hub.hubId)
+                        }}
+                      >
+                        직원 조회
+                      </button>
+                    ) : (
+                      <span className="text-muted">직원 없음</span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
